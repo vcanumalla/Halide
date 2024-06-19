@@ -70,6 +70,7 @@
 #include "StrictifyFloat.h"
 #include "StripAsserts.h"
 #include "Substitute.h"
+#include "Symbolize.h"
 #include "Tracing.h"
 #include "TrimNoOps.h"
 #include "UnifyDuplicateLets.h"
@@ -454,6 +455,9 @@ void lower_impl(const vector<Function> &output_funcs,
         s = strip_asserts(s);
         log("Lowering after stripping asserts:", s);
     }
+
+    debug(1) << "Making symbolic values...\n";
+    s = symbolize_constants(s);
 
     debug(1) << "Lowering after final simplification:\n"
              << s << "\n\n";
