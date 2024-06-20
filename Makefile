@@ -604,6 +604,7 @@ SOURCE_FILES = \
   StrictifyFloat.cpp \
   StripAsserts.cpp \
   Substitute.cpp \
+  Symbolize.cpp \
   Target.cpp \
   Tracing.cpp \
   TrimNoOps.cpp \
@@ -789,6 +790,7 @@ HEADER_FILES = \
   StrictifyFloat.h \
   StripAsserts.h \
   Substitute.h \
+  Symbolize.h \
   Target.h \
   Tracing.h \
   TrimNoOps.h \
