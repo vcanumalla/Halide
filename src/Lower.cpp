@@ -70,7 +70,7 @@
 #include "StrictifyFloat.h"
 #include "StripAsserts.h"
 #include "Substitute.h"
-#include "Symbolize.h"
+#include "SymbolicComplexity.h"
 #include "Tracing.h"
 #include "TrimNoOps.h"
 #include "UnifyDuplicateLets.h"
@@ -344,8 +344,10 @@ void lower_impl(const vector<Function> &output_funcs,
     log("Lowering after bounding constant extent loops:", s);
 
     debug(1) << "Unrolling...\n";
+    debug(1) << "BEFORE UNROLLING:\n\n\n\n" << s << "\n\n\n\n";
     s = unroll_loops(s);
     log("Lowering after unrolling:", s);
+    debug(1) << "AFTER UNROLLING:\n\n\n\n" << s << "\n\n\n\n";
 
     debug(1) << "Vectorizing...\n";
     s = vectorize_loops(s, env);
@@ -459,8 +461,8 @@ void lower_impl(const vector<Function> &output_funcs,
     debug(1) << "Making symbolic values...\n";
     s = symbolize_constants(s);
 
-    debug(1) << "Lowering after final simplification:\n"
-             << s << "\n\n";
+    debug(1) << "Lowering after final simplification:\n\n\n\n"
+             << s << "\n\n\n";
 
     if (!custom_passes.empty()) {
         for (size_t i = 0; i < custom_passes.size(); i++) {

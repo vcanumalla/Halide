@@ -1,5 +1,5 @@
-#ifndef HALIDE_SYMBOLIZE_H
-#define HALIDE_SYMBOLIZE_H
+#ifndef HALIDE_SYMBOLIC_COMPLEXITY_H
+#define HALIDE_SYMBOLIC_COMPLEXITY_H
 
 /** \file
  * Defines a pass for turning constants and concrete values to symbolic values */
