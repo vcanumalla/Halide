@@ -10,7 +10,7 @@ namespace Halide {
 namespace Internal {
 
 /**
- * Reduce constants in a statement to symbolic values
+ * Keep track of number of add operations in a program.
 */
 Stmt symbolize_constants(const Stmt &s);
 
