@@ -457,8 +457,9 @@ void lower_impl(const vector<Function> &output_funcs,
         s = strip_asserts(s);
         log("Lowering after stripping asserts:", s);
     }
+    debug(1) << "RIGHT BEFORE SYMBOLIZE_CONSTANTS\n" << s << "\n\n\n";
 
-    debug(1) << "Making symbolic values...\n";
+    debug(1) << "Counting symbolic values...\n";
     s = symbolize_constants(s);
 
     debug(1) << "Lowering after final simplification:\n\n\n\n"
