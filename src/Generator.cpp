@@ -802,6 +802,7 @@ gengen
             {"cpp", OutputFileType::c_source},
             {"h", OutputFileType::c_header},
             {"hlpipe", OutputFileType::hlpipe},
+            {"sca", OutputFileType::sca},
             {"html", OutputFileType::stmt_html},
             {"o", OutputFileType::object},
             {"py.c", OutputFileType::python_extension},
@@ -1636,6 +1637,10 @@ bool GeneratorBase::emit_cpp_stub(const std::string &stub_file_path) {
     std::ofstream file(stub_file_path);
     StubEmitter emit(file, generator_registered_name, generator_stub_name, pi.generator_params(), pi.inputs(), pi.outputs());
     emit.emit();
+    return true;
+}
+
+bool GeneratorBase::emit_sca(const std::string &sca_file_path) {
     return true;
 }
 

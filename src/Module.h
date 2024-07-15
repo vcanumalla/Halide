@@ -38,6 +38,7 @@ enum class OutputFileType {
     python_extension,
     pytorch_wrapper,
     registration,
+    sca,
     schedule,
     static_library,
     stmt,

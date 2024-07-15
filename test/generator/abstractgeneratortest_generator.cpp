@@ -136,6 +136,11 @@ public:
         return false;
     }
 
+    bool emit_sca(const std::string & /*sca_file_path*/) override {
+        // not supported
+        return false;
+    }
+
     bool emit_hlpipe(const std::string & /*hlpipe_file_path*/) override {
         // not supported
         return false;
