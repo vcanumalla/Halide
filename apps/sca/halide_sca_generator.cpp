@@ -1,6 +1,6 @@
 #include "Halide.h"
 namespace {
-class Passthru : public Halide::Generator<Passthru> {
+class HalideSCA : public Halide::Generator<HalideSCA> {
 public:
     Input<Buffer<int32_t, 2>> input{"input"};
     Output<Buffer<int32_t, 2>> output{"output"};
@@ -16,4 +16,4 @@ public:
     }
 };
 }  // namespace
-HALIDE_REGISTER_GENERATOR(Passthru, passthru) 
+HALIDE_REGISTER_GENERATOR(HalideSCA, halide_sca) 
