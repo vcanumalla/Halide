@@ -1081,6 +1081,11 @@ void execute_generator(const ExecuteGeneratorArgs &args_in) {
 
         if (args.output_types.count(OutputFileType::sca)) {
             std::cout << "Generating SCA for " << args.generator_name << "...\n";
+            // FIXME: this should obviously be multiple targets like below when we write actual code
+            const Target &target = args.targets[0];
+            auto gen = args.create_generator(args.generator_name, GeneratorContext(target));
+            auto output_files = compute_output_files(target, base_path, args.output_types);
+            gen->emit_sca(output_files[OutputFileType::sca]);
         }
 #ifdef WITH_SERIALIZATION
         if (args.output_types.count(OutputFileType::hlpipe)) {
@@ -1643,16 +1648,16 @@ bool GeneratorBase::emit_cpp_stub(const std::string &stub_file_path) {
 }
 
 bool GeneratorBase::emit_sca(const std::string &sca_file_path) {
-    // user_assert(!generator_registered_name.empty() && !generator_stub_name.empty()) << "Generator has no name.\n";
-    // // from the generated pipeline, obtain the module
-    // Module m = build_module();
+    user_assert(!generator_registered_name.empty() && !generator_stub_name.empty()) << "Generator has no name.\n";
+    // from the generated pipeline, obtain the module
+    Module m = build_module();
     // // get the body of the first function in the module
-    // Stmt s = m.functions()[0].body;
+    Stmt s = m.functions()[0].body;
+    debug(1) << "stmt from module:\n" << s << "\n";
     // // write the body to the file
     // std::ofstream
     //     file(sca_file_path);
     // file << s;
-
     // acknowledge that this piece of code has been ran with a print ln
     std::cout << "emit_sca() has been called" << std::endl;
     return true;
