@@ -14,6 +14,10 @@ namespace Internal {
 */
 Stmt symbolize_constants(const Stmt &s);
 
+/**
+ * Return a Halide pipeline from the given stmt
+ */
+Stmt compute_pipeline(const Stmt &s);
 
 }  // namespace Internal
 }  // namespace Halide

@@ -48,6 +48,11 @@ Stmt symbolize_constants(const Stmt &s) {
 
 }
 
+Stmt compute_pipeline(const Stmt &s) {
+    SymbolicComplexity complexity;
+    s.accept(&complexity);
+    return s;
+}
 
 
 } // namespace Internal

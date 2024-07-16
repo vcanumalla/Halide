@@ -656,7 +656,7 @@ gengen
      [assembly, bitcode, c_header, c_source, cpp_stub, featurization,
       llvm_assembly, object, python_extension, pytorch_wrapper, registration,
       schedule, static_library, stmt, stmt_html, conceptual_stmt,
-      conceptual_stmt_html, compiler_log, hlpipe, device_code].
+      conceptual_stmt_html, compiler_log, hlpipe, sca, device_code].
      If omitted, default value is [c_header, static_library, registration].
 
  -p  A comma-separated list of shared libraries that will be loaded before the
@@ -1079,6 +1079,10 @@ void execute_generator(const ExecuteGeneratorArgs &args_in) {
             gen->emit_cpp_stub(output_files[OutputFileType::cpp_stub]);
         }
 
+        if (args.output_types.count(OutputFileType::sca)) {
+            auto gen = generator_factory(args.function_name, args.targets[0]);
+            gen->emit_sca("random.sca");
+        }
 #ifdef WITH_SERIALIZATION
         if (args.output_types.count(OutputFileType::hlpipe)) {
             // When serializing a halide pipeline, target is required (since the schedule may be target dependent).
@@ -1641,6 +1645,18 @@ bool GeneratorBase::emit_cpp_stub(const std::string &stub_file_path) {
 }
 
 bool GeneratorBase::emit_sca(const std::string &sca_file_path) {
+    // user_assert(!generator_registered_name.empty() && !generator_stub_name.empty()) << "Generator has no name.\n";
+    // // from the generated pipeline, obtain the module
+    // Module m = build_module();
+    // // get the body of the first function in the module
+    // Stmt s = m.functions()[0].body;
+    // // write the body to the file
+    // std::ofstream
+    //     file(sca_file_path);
+    // file << s;
+
+    // acknowledge that this piece of code has been ran with a print ln
+    std::cout << "emit_sca() has been called" << std::endl;
     return true;
 }
 
