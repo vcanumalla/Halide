@@ -1080,8 +1080,7 @@ void execute_generator(const ExecuteGeneratorArgs &args_in) {
         }
 
         if (args.output_types.count(OutputFileType::sca)) {
-            auto gen = generator_factory(args.function_name, args.targets[0]);
-            gen->emit_sca("random.sca");
+            std::cout << "Generating SCA for " << args.generator_name << "...\n";
         }
 #ifdef WITH_SERIALIZATION
         if (args.output_types.count(OutputFileType::hlpipe)) {

@@ -46,6 +46,8 @@ std::map<OutputFileType, const OutputInfo> get_output_info(const Target &target)
         {OutputFileType::python_extension, {"python_extension", ".py.cpp", IsSingle}},
         {OutputFileType::pytorch_wrapper, {"pytorch_wrapper", ".pytorch.h", IsSingle}},
         {OutputFileType::registration, {"registration", ".registration.cpp", IsSingle}},
+        // FIXME: should sca be IsMulti?
+        {OutputFileType::sca, {"sca", ".sca", IsSingle}},
         {OutputFileType::schedule, {"schedule", ".schedule.h", IsSingle}},
         {OutputFileType::static_library, {"static_library", is_windows_coff ? ".lib" : ".a", IsSingle}},
         {OutputFileType::stmt, {"stmt", ".stmt", IsMulti}},
