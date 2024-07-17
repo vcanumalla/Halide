@@ -7,12 +7,12 @@ public:
     void generate() {
         Var x, y;
         output(x, y) = input(x, y);
-        if (!using_autoscheduler()) {
-            output.parallel(y).vectorize(x, natural_vector_size<int32_t>()).compute_root();
-        } else {
-            input.set_estimates({{0, 256}});
-            output.set_estimates({{0, 256}});
-        }
+        // if (!using_autoscheduler()) {
+        //     output.parallel(y).vectorize(x, natural_vector_size<int32_t>()).compute_root();
+        // } else {
+        //     input.set_estimates({{0, 256}});
+        //     output.set_estimates({{0, 256}});
+        // }
     }
 };
 }  // namespace
