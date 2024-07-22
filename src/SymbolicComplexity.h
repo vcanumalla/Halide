@@ -6,13 +6,14 @@
 
 #include "Expr.h"
 #include "Pipeline.h"
+#include "Func.h"
 namespace Halide {
 namespace Internal {
 
 /**
  * Return a Halide pipeline from the given stmt
  */
-Pipeline compute_complexity(const Stmt &s);
+Expr compute_complexity(const Stmt &s);
 
 }  // namespace Internal
 }  // namespace Halide

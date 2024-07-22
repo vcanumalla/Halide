@@ -1655,8 +1655,13 @@ bool GeneratorBase::emit_sca(const std::string &sca_file_path) {
     std::map<std::string, Parameter> params;  // FIXME: Remove when API allows this to be optional
 
     // Run the visitor
-    Pipeline pipeline = compute_complexity(s);
-    serialize_pipeline(pipeline, sca_file_path, params);
+    std::cout << "Running SCA on Generator " << "...\n";
+    Expr e1 = 2 + 2;
+    // func from e1
+    Func f1 = Func(e1);
+    Pipeline pp = Pipeline(f1);
+    Expr e = compute_complexity(s);
+    serialize_pipeline(pp, sca_file_path, params);
     return true;
 }
 
