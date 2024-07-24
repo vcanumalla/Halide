@@ -13,7 +13,7 @@ namespace Internal {
 /**
  * Return a Halide pipeline from the given stmt
  */
-Expr compute_complexity(const Stmt &s);
+Pipeline compute_complexity(const Stmt &s);
 
 }  // namespace Internal
 }  // namespace Halide

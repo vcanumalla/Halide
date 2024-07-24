@@ -1656,12 +1656,8 @@ bool GeneratorBase::emit_sca(const std::string &sca_file_path) {
 
     // Run the visitor
     std::cout << "Running SCA on Generator " << "...\n";
-    Expr e1 = 2 + 2;
-    // func from e1
-    Func f1 = Func(e1);
-    Pipeline pp = Pipeline(f1);
-    Expr e = compute_complexity(s);
-    serialize_pipeline(pp, sca_file_path, params);
+    Pipeline p = compute_complexity(s);
+    serialize_pipeline(p, sca_file_path, params);
     return true;
 }
 

@@ -46,6 +46,8 @@ class SymbolicComplexity : public IRVisitor {
     void visit (const Add *op) override {
         debug(2) << "Visiting add: " << op->a << " + " << op->b << "\n";
         op->a.accept(this);
+        rawAdds = rawAdds + factor;
+
         op->b.accept(this);
     }
 
@@ -53,7 +55,7 @@ public:
     SymbolicComplexity() = default;
     Expr factor = 1;
     int rawFor;
-    int rawAdds;
+    Expr rawAdds = 0;
     int depth = 0;
     Expr totalRange;
 };
@@ -61,14 +63,21 @@ public:
 }  // namespace
 
 
-Expr compute_complexity(const Stmt &s) { 
+Pipeline compute_complexity(const Stmt &s) { 
 
     SymbolicComplexity complexity;
     s.accept(&complexity);
 
     Expr e = complexity.totalRange;
     debug(1) << "Total range: " << e << "\n";
-    return e;
+    debug(1) << "Total adds:" << complexity.rawAdds << "\n";
+
+    Func eq_adds;
+    eq_adds() = complexity.rawAdds;
+    std::vector<Func> outputs;
+    outputs.push_back(eq_adds);
+    Pipeline p = Pipeline(outputs);
+    return p;
 }
 
 
