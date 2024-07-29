@@ -43,10 +43,10 @@ public:
             .split(y, y, yi, 32)
             .parallel(y)
             .vectorize(x, 16);
-        // blur_x
-        //     .store_at(blur_y, y)
-        //     .compute_at(blur_y, x)
-        //     .vectorize(x, 16);
+        blur_x
+            .store_at(blur_y, y)
+            .compute_at(blur_y, x)
+            .vectorize(x, 16);
     }
 };
 }  // namespace
