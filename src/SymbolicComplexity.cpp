@@ -122,7 +122,7 @@ class NumLoads : public IRVisitor {
     using IRVisitor::visit;
     void visit (const Load *op) {
         op->index.accept(this);
-        numLoads = numLoads + factor;
+        numLoads = numLoads + inline_expr(bindings, factor);
     }
     void visit(const For *op) {
         factor = factor * (op->extent - op->min);
@@ -166,20 +166,22 @@ Pipeline compute_complexity(const Stmt &s) {
 
     NumStores ns(bindings);
     s.accept(&ns);
+    debug(1) << "numStores:  " << ns.numStores << "\n";
     Func numStores("numStores");
     numStores() = ns.numStores;
     outputs.push_back(numStores);
-    debug(1) << "numStores: " << ns.numStores << "\n";
     
 
     NumLoads nl(bindings);
     s.accept(&nl);
+    debug(1) << "numLoads: " << nl.numLoads << "\n";
     Func numLoads("numLoads");
     numLoads() = nl.numLoads;
     outputs.push_back(numLoads);
-    debug(1) << "numLoads: " << nl.numLoads << "\n";
 
+    
     Pipeline p = Pipeline(outputs);
+    // p = Pipeline({Func(2 + 2), Func(3 + 3)});
     return p;
 }
 
