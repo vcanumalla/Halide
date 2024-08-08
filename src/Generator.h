@@ -3699,6 +3699,7 @@ public:
     void bind_input(const std::string &name, const std::vector<Expr> &v) override;
 
     bool emit_cpp_stub(const std::string &stub_file_path) override;
+    bool emit_sca(const std::string &sca_filepath) override;
     bool emit_hlpipe(const std::string &hlpipe_file_path) override;
 
     GeneratorBase(const GeneratorBase &) = delete;

@@ -177,6 +177,12 @@ public:
      */
     virtual bool emit_cpp_stub(const std::string &stub_file_path) = 0;
 
+    /** Emit a halide complexity analysis (.sca) file to the given path.
+     *  TODO(@vcanumalla): Add doc comment for this method.
+     */
+    virtual bool emit_sca(const std::string &sca_file_path) = 0;
+
+
     /** Emit a Serialized Halide Pipeline (.hlpipe) file to the given path. Not all Generators support this.
      *
      * If you call this method, you should not call any other AbstractGenerator methods
