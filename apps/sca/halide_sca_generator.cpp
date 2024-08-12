@@ -1,3 +1,8 @@
+
+////////////////////////////////////////////
+///// Simple algorithim example ////////////
+////////////////////////////////////////////
+
 // #include "Halide.h"
 // namespace {
 // class HalideSCA : public Halide::Generator<HalideSCA> {
@@ -9,43 +14,49 @@
 //         output(x, y) = input(x, y) + 5;
 //     }
 // };
-
-
-
-
-
-
 // }  // namespace
 // HALIDE_REGISTER_GENERATOR(HalideSCA, halide_sca) 
 
 
 
-
+////////////////////////////////////////////
+///// Lesson 8 Example /////////////////////
+////////////////////////////////////////////
 
 #include "Halide.h"
 namespace {
 class HalideSCA : public Halide::Generator<HalideSCA> {
 public:
-    // GeneratorParam<int> tile_x{"tile_x", 32};  // X tile.
-    // GeneratorParam<int> tile_y{"tile_y", 8};   // Y tile.
 
-    Input<Buffer<float, 2>> input{"input"};
-    Output<Buffer<float, 2>> blur_y{"blur_y"};
+    Output<Buffer<float, 2>> consumer{"consumer"};
     void generate() {
-        Var x("x_dim"), y("y_dim"), yi("yi_inner");
+        Var x("x_dim"), y("y_dim");
 
-        Func producer("producer"), consumer("consumer");
+        Func producer("producer");
         producer(x, y) = sin(x * y);
 
-        blur_y(x, y) = (producer(x, y) +
+        consumer(x, y) = (producer(x, y) +
                     producer(x, y + 1) +
                     producer(x + 1, y) +
                     producer(x + 1, y + 1)) / 4;
 
-        producer.compute_root();
-        // consumer.trace_stores();
-        // producer.trace_stores();
-        // blur_y(x, y) = consumer(x, y);
+        // stats via tracing using runtime (see `lesson_08_scheduling_2.cpp`) on a 4x4 input:
+        // Full inlining (the default schedule):
+        // - Loads: 0
+        // - Stores: 16
+        
+        /* Evaluating producer first */
+        // producer.compute_root();
+        // stats:
+        // - Loads: 64
+        // - Stores: 41
+
+        /* Compute as needed */
+        // producer.compute_at(consumer, y);
+        // stats:
+        // - Loads: 64
+        // - Stores: 56
+
     }
 };
 }  // namespace

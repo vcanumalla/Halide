@@ -13,12 +13,10 @@ namespace Internal {
 
 namespace {
 
-
 Expr inline_expr(std::map<std::string, Expr> bindings, Expr e) {
     if (e.as<Variable>()) {
         std::string name = e.as<Variable>()->name;
         if (bindings.find(name) != bindings.end()) {
-            // return Expr(2 + 2);
             return inline_expr(bindings, bindings[name]);
         }
         else {
@@ -79,6 +77,11 @@ class VariableBindings: public IRVisitor {
 
 class NumAdds: public IRVisitor {
     using IRVisitor::visit;
+
+    void visit(const AssertStmt *op) {
+        // do nothing, skip the assert
+        debug(1) << "Found assert\n";
+    }
     void visit(const For *op) {
         factor = factor * (op->extent - op->min);
         op->body.accept(this);
@@ -157,7 +160,7 @@ Pipeline compute_complexity(const Stmt &s) {
     auto bindings = vb.bindings;
     print_bindings(vb.bindings);
 
-    // run number of adds visitor
+    // Collect all the metrics
     NumAdds na(bindings);
     s.accept(&na);
     Func numAdds("numAdds");
@@ -171,7 +174,6 @@ Pipeline compute_complexity(const Stmt &s) {
     numStores() = ns.numStores;
     outputs.push_back(numStores);
     
-
     NumLoads nl(bindings);
     s.accept(&nl);
     debug(1) << "numLoads: " << nl.numLoads << "\n";
@@ -181,7 +183,12 @@ Pipeline compute_complexity(const Stmt &s) {
 
     
     Pipeline p = Pipeline(outputs);
-    // p = Pipeline({Func(2 + 2), Func(3 + 3)});
+
+    // std::vector<Func> test;
+    // test.push_back(Func(2 + 2));
+    // test.push_back(Func(3 + 3));
+    // test.push_back(Func(4 + 4));
+    // p = Pipeline(test);
     return p;
 }
 
