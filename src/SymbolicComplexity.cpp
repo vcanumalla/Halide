@@ -13,6 +13,21 @@ namespace Internal {
 
 namespace {
 
+class VariableBindings: public IRVisitor {
+    using IRVisitor::visit;
+    
+    void visit(const LetStmt *op) {
+        std::string name = op->name;
+        Expr value = op->value;
+        bindings[name] = value;
+        op->body.accept(this);
+
+    }
+    public:
+        std::map<std::string, Expr> bindings;
+
+};
+
 Expr inline_expr(std::map<std::string, Expr> bindings, Expr e) {
     if (e.as<Variable>()) {
         std::string name = e.as<Variable>()->name;
@@ -60,22 +75,8 @@ Expr inline_expr(std::map<std::string, Expr> bindings, Expr e) {
     }
     return e;
 }
-class VariableBindings: public IRVisitor {
-    using IRVisitor::visit;
-    
-    void visit(const LetStmt *op) {
-        std::string name = op->name;
-        Expr value = op->value;
-        bindings[name] = value;
-        op->body.accept(this);
 
-    }
-    public:
-        std::map<std::string, Expr> bindings;
-
-};
-
-class NumAdds: public IRVisitor {
+class ComputeMetrics: public IRVisitor {
     using IRVisitor::visit;
 
     void visit(const AssertStmt *op) {
@@ -110,75 +111,52 @@ class NumAdds: public IRVisitor {
         op->b.accept(this);
     }
     public:
-
-        NumAdds(std::map<std::string, Expr> b) : bindings(b) {}
+        ComputeMetrics(std::map<std::string, Expr> b) : bindings(b) {}
         std::map<std::string, Expr> bindings;
         Expr factor = 1;
         Expr numAdds = 0;
         Expr numFloatAdds = 0;
 };
-
-class NumStores : public IRVisitor {
+class BandwidthMetrics : public IRVisitor {
     using IRVisitor::visit;
     void visit(const Store *op) {
         op->value.accept(this);
         op->index.accept(this);
         Expr tmp_factor = inline_expr(bindings, factor);
         numStores = numStores + inline_expr(bindings, factor);
-        // if the store is over a bus, we care about the bandwidth
+        // if the store is to an external buffer
         if (op->param.defined()) {
             Type t = op->param.type();
             bytesWritten = bytesWritten + (t.bytes() * tmp_factor);
         }
     }
-    void visit(const For *op) {
-        factor = factor * (op->extent - op->min);
-        op->body.accept(this);
-        factor = factor / (op->extent - op->min);
-    }
-
-    public:
-
-        NumStores(std::map<std::string, Expr> b) : bindings(b) {}
-        std::map<std::string, Expr> bindings;
-        Expr bytesWritten = 0;
-        Expr factor = 1;
-        Expr numStores = 0;
-};
-
-class NumLoads : public IRVisitor {
-    using IRVisitor::visit;
     void visit (const Load *op) {
         op->index.accept(this);
-        numLoads = numLoads + inline_expr(bindings, factor);
+        Expr tmp_factor = inline_expr(bindings, factor);
+        numLoads = numLoads + tmp_factor;
+
+        // if the load is from an external buffer
+        if (op->param.defined()) {
+            Type t = op->param.type();
+            bytesLoaded = bytesLoaded + (t.bytes() * tmp_factor);
+        }
     }
     void visit(const For *op) {
         factor = factor * (op->extent - op->min);
         op->body.accept(this);
         factor = factor / (op->extent - op->min);
     }
-    public:
 
-        NumLoads(std::map<std::string, Expr> b) : bindings(b) {}
+    public:
+        BandwidthMetrics(std::map<std::string, Expr> b) : bindings(b) {}
         std::map<std::string, Expr> bindings;
         Expr factor = 1;
+        Expr numStores = 0;
+        Expr bytesWritten = 0;   
         Expr numLoads = 0;
-    
+        Expr bytesLoaded = 0; 
 };
 
-class Bandwidth : public IRVisitor {
-    using IRVisitor::visit;
-    void visit(const Store *op) {
-        // check if store is to a buffer, we care about stores over the bus
-        if (op->param.defined()) {
-            debug(-1) << "found a store to a buffer!\n";
-        }
-
-    }
-    public:
-        Expr bytesLoaded = 0;
-        Expr bytesStored = 0;
-};
 }  // namespace
 
 void print_bindings(std::map<std::string, Expr> bindings) {
@@ -200,35 +178,35 @@ Pipeline compute_complexity(const Stmt &s) {
     print_bindings(vb.bindings);
 
     // All the visitors
-    NumAdds na(bindings);
-    NumStores ns(bindings);
-    NumLoads nl(bindings);
+    ComputeMetrics compute(bindings);
+    BandwidthMetrics bandwidth(bindings);
 
     // Number of adds
-    s.accept(&na);
-    s.accept(&ns);
-    s.accept(&nl);
+    s.accept(&compute);
+    s.accept(&bandwidth);
 
     Func numAdds("numAdds");
     Func numFloatAdds("numFloatAdds");
     Func numStores("numStores");
     Func numLoads("numLoads");
     Func bytesWritten("bytesWritten");
-
+    Func bytesLoaded("bytesLoaded");
     /* TODO(@vcanumalla): add float adds back in */ 
 
-    numFloatAdds() = na.numFloatAdds;
-    numAdds() = na.numAdds;
-    numStores() = ns.numStores;
-    numLoads() = nl.numLoads;
+    numFloatAdds() = compute.numFloatAdds;
+    numAdds() = compute.numAdds;
+    numStores() = bandwidth.numStores;
+    numLoads() = bandwidth.numLoads;
 
-    bytesWritten() = ns.bytesWritten;
+    bytesWritten() = bandwidth.bytesWritten;
+    bytesLoaded() = bandwidth.bytesLoaded;
 
     outputs.push_back(numAdds);
     outputs.push_back(numFloatAdds);
     outputs.push_back(numStores);
     outputs.push_back(numLoads);
     outputs.push_back(bytesWritten);
+    outputs.push_back(bytesLoaded);
 
     Pipeline p(outputs);
     // std::vector<Func> test;
