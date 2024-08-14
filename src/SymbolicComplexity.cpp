@@ -79,7 +79,7 @@ class NumAdds: public IRVisitor {
     using IRVisitor::visit;
 
     void visit(const AssertStmt *op) {
-        // do nothing, skip the assert
+        // do nothing, skip this stmt entirely
         debug(1) << "Found assert\n";
     }
     void visit(const For *op) {
@@ -87,9 +87,26 @@ class NumAdds: public IRVisitor {
         op->body.accept(this);
         factor = factor / (op->extent - op->min);
     }
+    void visit(const Cast *op) {
+        debug(1) << "Found cast and is casting to " << op->type << "\n";
+        op->value.accept(this);
+    }
     void visit(const Add *op) {
         op->a.accept(this);
-        numAdds = numAdds + inline_expr(bindings, factor);
+
+
+        if (op->a.type() == op->b.type()) {
+            if (op->a.type().is_float()) {
+                numFloatAdds = numFloatAdds + inline_expr(bindings, factor);
+            }
+            else {
+                numAdds = numAdds + inline_expr(bindings, factor);
+            }
+        }
+        else {
+            debug(1) << "Found type mismatch\n";
+            numAdds = numAdds + inline_expr(bindings, factor);
+        }
         op->b.accept(this);
     }
     public:
@@ -98,6 +115,7 @@ class NumAdds: public IRVisitor {
         std::map<std::string, Expr> bindings;
         Expr factor = 1;
         Expr numAdds = 0;
+        Expr numFloatAdds = 0;
 };
 
 class NumStores : public IRVisitor {
@@ -105,7 +123,13 @@ class NumStores : public IRVisitor {
     void visit(const Store *op) {
         op->value.accept(this);
         op->index.accept(this);
+        Expr tmp_factor = inline_expr(bindings, factor);
         numStores = numStores + inline_expr(bindings, factor);
+        // if the store is over a bus, we care about the bandwidth
+        if (op->param.defined()) {
+            Type t = op->param.type();
+            bytesWritten = bytesWritten + (t.bytes() * tmp_factor);
+        }
     }
     void visit(const For *op) {
         factor = factor * (op->extent - op->min);
@@ -117,6 +141,7 @@ class NumStores : public IRVisitor {
 
         NumStores(std::map<std::string, Expr> b) : bindings(b) {}
         std::map<std::string, Expr> bindings;
+        Expr bytesWritten = 0;
         Expr factor = 1;
         Expr numStores = 0;
 };
@@ -140,18 +165,32 @@ class NumLoads : public IRVisitor {
         Expr numLoads = 0;
     
 };
+
+class Bandwidth : public IRVisitor {
+    using IRVisitor::visit;
+    void visit(const Store *op) {
+        // check if store is to a buffer, we care about stores over the bus
+        if (op->param.defined()) {
+            debug(-1) << "found a store to a buffer!\n";
+        }
+
+    }
+    public:
+        Expr bytesLoaded = 0;
+        Expr bytesStored = 0;
+};
 }  // namespace
 
 void print_bindings(std::map<std::string, Expr> bindings) {
     for (auto it = bindings.begin(); it != bindings.end(); it++) {
         std::string name = it->first;
         Expr value = it->second;
-        debug(1) << name << " = " << value << "\n";
+        debug(-1) << name << " = " << value << "\n";
     }
 }
 
 Pipeline compute_complexity(const Stmt &s) { 
-    debug(1) << "\n\n\n\ncompute_complexity:\n" << s << "\n\n\n\n";
+    debug(-1) << "compute_complexity:\n" << s << "\n";
     std::vector<Func> outputs;
 
     // bind variables to symbolic values
@@ -160,30 +199,38 @@ Pipeline compute_complexity(const Stmt &s) {
     auto bindings = vb.bindings;
     print_bindings(vb.bindings);
 
-    // Collect all the metrics
+    // All the visitors
     NumAdds na(bindings);
-    s.accept(&na);
-    Func numAdds("numAdds");
-    numAdds() = na.numAdds;
-    outputs.push_back(numAdds);
-
     NumStores ns(bindings);
-    s.accept(&ns);
-    debug(1) << "numStores:  " << ns.numStores << "\n";
-    Func numStores("numStores");
-    numStores() = ns.numStores;
-    outputs.push_back(numStores);
-    
     NumLoads nl(bindings);
+
+    // Number of adds
+    s.accept(&na);
+    s.accept(&ns);
     s.accept(&nl);
-    debug(1) << "numLoads: " << nl.numLoads << "\n";
+
+    Func numAdds("numAdds");
+    Func numFloatAdds("numFloatAdds");
+    Func numStores("numStores");
     Func numLoads("numLoads");
+    Func bytesWritten("bytesWritten");
+
+    /* TODO(@vcanumalla): add float adds back in */ 
+
+    numFloatAdds() = na.numFloatAdds;
+    numAdds() = na.numAdds;
+    numStores() = ns.numStores;
     numLoads() = nl.numLoads;
+
+    bytesWritten() = ns.bytesWritten;
+
+    outputs.push_back(numAdds);
+    outputs.push_back(numFloatAdds);
+    outputs.push_back(numStores);
     outputs.push_back(numLoads);
+    outputs.push_back(bytesWritten);
 
-    
-    Pipeline p = Pipeline(outputs);
-
+    Pipeline p(outputs);
     // std::vector<Func> test;
     // test.push_back(Func(2 + 2));
     // test.push_back(Func(3 + 3));

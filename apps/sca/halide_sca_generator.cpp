@@ -64,6 +64,9 @@ HALIDE_REGISTER_GENERATOR(HalideSCA, halide_sca)
 
 
 
+////////////////////////////////////////////
+//// Parallel Blur Example /////////////////
+////////////////////////////////////////////
 
 // #include "Halide.h"
 // namespace {
@@ -84,11 +87,11 @@ HALIDE_REGISTER_GENERATOR(HalideSCA, halide_sca)
 
 //         blur_x(x, y) = (clamped(x, y) + clamped(x + 1, y) + clamped(x + 2, y)) / 3;
 //         blur_y(x, y) = (blur_x(x, y) + blur_x(x, y + 1) + blur_x(x, y + 2)) / 3;
-//         // blur_y
-//         //     .split(y, y, yi, 32)
-//         //     .parallel(y)
-//         //     .vectorize(x, 16);
-//         // blur_y.compute_root();
+//         blur_y
+//             .split(y, y, yi, 32)
+//             .parallel(y)
+//             .vectorize(x, 16);
+//         blur_y.compute_root();
 //         output(x, y) = blur_y(x, y);
 //     }
 // };
