@@ -27,7 +27,8 @@ class VariableBindings: public IRVisitor {
         std::map<std::string, Expr> bindings;
 
 };
-
+// helper function that uses input pipeline's bindings to inline expressions
+// so the new pipeline has no unbound variables.
 Expr inline_expr(std::map<std::string, Expr> bindings, Expr e) {
     if (e.as<Variable>()) {
         std::string name = e.as<Variable>()->name;
@@ -79,72 +80,124 @@ Expr inline_expr(std::map<std::string, Expr> bindings, Expr e) {
 class ComputeMetrics: public IRVisitor {
     using IRVisitor::visit;
 
-    void visit(const AssertStmt *op) {
-        // do nothing, skip this stmt entirely
-        debug(1) << "Found assert\n";
-    }
+    // void visit(const AssertStmt *op) {
+    //     // do nothing, skip this stmt entirely
+    //     debug(1) << "Found assert\n";
+    // }
     void visit(const For *op) {
-        factor = factor * (op->extent - op->min);
+        factor = inline_expr(bindings, factor * (op->extent - op->min));
         op->body.accept(this);
-        factor = factor / (op->extent - op->min);
+        factor = inline_expr(bindings, factor / (op->extent - op->min));
     }
-    void visit(const Cast *op) {
-        debug(1) << "Found cast and is casting to " << op->type << "\n";
-        op->value.accept(this);
-    }
+
     void visit(const Add *op) {
         op->a.accept(this);
-
-
         if (op->a.type() == op->b.type()) {
             if (op->a.type().is_float()) {
-                numFloatAdds = numFloatAdds + inline_expr(bindings, factor);
+                arithFloatOps = arithFloatOps + factor;
             }
             else {
-                numAdds = numAdds + inline_expr(bindings, factor);
+                arithIntOps = arithIntOps + factor;
             }
         }
         else {
             debug(1) << "Found type mismatch\n";
-            numAdds = numAdds + inline_expr(bindings, factor);
         }
         op->b.accept(this);
+    }
+
+    void visit(const Sub *op) {
+        op->a.accept(this);
+        if (op->a.type() == op->b.type()) {
+            if (op->a.type().is_float()) {
+                arithFloatOps = arithFloatOps + factor;
+            }
+            else {
+                arithIntOps = arithIntOps + factor;
+            }
+        }
+        else {
+            debug(1) << "Found type mismatch\n";
+        }
+        op->b.accept(this);
+    }    
+    
+    void visit(const Mul *op) {
+        op->a.accept(this);
+        if (op->a.type() == op->b.type()) {
+            if (op->a.type().is_float()) {
+                arithFloatOps = arithFloatOps + factor;
+            }
+            else {
+                arithIntOps = arithIntOps + factor;
+            }
+        }
+        else {
+            debug(1) << "Found type mismatch\n";
+        }
+        op->b.accept(this);
+    }
+
+    void visit(const Div *op) {
+        op->a.accept(this);
+        if (op->a.type() == op->b.type()) {
+            if (op->a.type().is_float()) {
+                arithFloatOps = arithFloatOps + factor;
+            }
+            else {
+                arithIntOps = arithIntOps + factor;
+            }
+        }
+        else {
+            debug(1) << "Found type mismatch\n";
+        }
+        op->b.accept(this);
+    }
+
+    // transcendental functions
+    void visit(const Call *op) {
+        debug(-1) << "found a call: " << op->name << " " << op->call_type << "\n";
+        if (op->call_type == Call::PureExtern) {
+            transcendentalOps = transcendentalOps + factor;
+        }       
     }
     public:
         ComputeMetrics(std::map<std::string, Expr> b) : bindings(b) {}
         std::map<std::string, Expr> bindings;
         Expr factor = 1;
-        Expr numAdds = 0;
-        Expr numFloatAdds = 0;
+        Expr arithIntOps = 0;
+        Expr arithFloatOps = 0;
+        Expr transcendentalOps = 0;
 };
 class BandwidthMetrics : public IRVisitor {
     using IRVisitor::visit;
+
+    void visit(const For *op) {
+        factor = inline_expr(bindings, factor * (op->extent - op->min));
+        op->body.accept(this);
+        factor = inline_expr(bindings, factor / (op->extent - op->min));
+    }
+
     void visit(const Store *op) {
         op->value.accept(this);
         op->index.accept(this);
-        Expr tmp_factor = inline_expr(bindings, factor);
-        numStores = numStores + inline_expr(bindings, factor);
+        numStores = numStores + factor;
         // if the store is to an external buffer
         if (op->param.defined()) {
             Type t = op->param.type();
-            bytesWritten = bytesWritten + (t.bytes() * tmp_factor);
+            bytesWritten = bytesWritten + (t.bytes() * factor);
         }
     }
+
     void visit (const Load *op) {
         op->index.accept(this);
-        Expr tmp_factor = inline_expr(bindings, factor);
-        numLoads = numLoads + tmp_factor;
+        numLoads = numLoads + factor;
 
         // if the load is from an external buffer
         if (op->param.defined()) {
             Type t = op->param.type();
-            bytesLoaded = bytesLoaded + (t.bytes() * tmp_factor);
+            bytesLoaded = bytesLoaded + (t.bytes() * factor);
         }
-    }
-    void visit(const For *op) {
-        factor = factor * (op->extent - op->min);
-        op->body.accept(this);
-        factor = factor / (op->extent - op->min);
     }
 
     public:
@@ -185,29 +238,31 @@ Pipeline compute_complexity(const Stmt &s) {
     s.accept(&compute);
     s.accept(&bandwidth);
 
-    Func numAdds("numAdds");
-    Func numFloatAdds("numFloatAdds");
+    Func arithIntOps("arithIntOps");
+    Func arithFloatOps("arithFloatOps");
     Func numStores("numStores");
     Func numLoads("numLoads");
     Func bytesWritten("bytesWritten");
     Func bytesLoaded("bytesLoaded");
+    Func transcendentalOps("transcendentalOps");
     /* TODO(@vcanumalla): add float adds back in */ 
 
-    numFloatAdds() = compute.numFloatAdds;
-    numAdds() = compute.numAdds;
+    arithFloatOps() = compute.arithFloatOps;
+    arithIntOps() = compute.arithIntOps;
     numStores() = bandwidth.numStores;
     numLoads() = bandwidth.numLoads;
-
+    debug(-1) << "num trans ops: " << compute.transcendentalOps << "\n";
     bytesWritten() = bandwidth.bytesWritten;
     bytesLoaded() = bandwidth.bytesLoaded;
-
-    outputs.push_back(numAdds);
-    outputs.push_back(numFloatAdds);
+    transcendentalOps() = compute.transcendentalOps;
+    outputs.push_back(arithIntOps);
+    outputs.push_back(arithFloatOps);
+    outputs.push_back(transcendentalOps);
     outputs.push_back(numStores);
     outputs.push_back(numLoads);
     outputs.push_back(bytesWritten);
     outputs.push_back(bytesLoaded);
-
+    
     Pipeline p(outputs);
     // std::vector<Func> test;
     // test.push_back(Func(2 + 2));

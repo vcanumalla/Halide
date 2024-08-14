@@ -44,18 +44,21 @@ public:
         // Full inlining (the default schedule):
         // - Loads: 0
         // - Stores: 16
+        // - Calls to sin: 64
         
         /* Evaluating producer first */
         // producer.compute_root();
         // stats:
         // - Loads: 64
         // - Stores: 41
+        // - Calls to sin: 25
 
         /* Compute as needed */
-        // producer.compute_at(consumer, y);
+        producer.compute_at(consumer, y);
         // stats:
         // - Loads: 64
         // - Stores: 56
+        // - Calls to sin: 40
 
     }
 };
