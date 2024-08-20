@@ -65,25 +65,44 @@ const std::set<std::string> transcendental_ops = {
     "tan_f64",
     "tanh_f64",
 };
+/*
+1. Visitor which finds all the funcs in the IR, all the scopes we want to examine individually
+2. Mutator which strips the stores, but creates variables and output buffer for the metrics _for the func_
+3. generic mutator that operates on a func, and updates based on the actions in the func
+4. Final mutator can write all the variables to the output buffer _for the func_ 
+5. buffers per each function that have all the metrics
+*/
+class FindFuncs : public IRVisitor {
+    using IRVisitor::visit;
+    // if we see a produce stmt, we know this is a distinct halide func
+    void visit(const ProducerConsumer *op) {
+        if (op->is_producer) {
+            debug(-1) << "Found a producer: " << op->name << "\n";
+            funcs.push_back(op->name);
+        }
+        op->body.accept(this);
+    }
+public:
+    std::vector<std::string> funcs;
+};
+class CreateMetrics: public IRMutator {
+    using IRMutator::visit;
+    // add global exprs for each func
+    
+public:
+    const std::vector<std::string> func_names;
+};
+class StripStores : public IRMutator {
+    using IRMutator::visit;
+};
 class SCA : public IRMutator {
     using IRMutator::visit;
-    Stmt visit(const For *for_loop) override {
-        // get factor and store it
-        factor = factor * (for_loop->extent- for_loop->min);
-        debug(-1) << "found a for loop with min: " << for_loop->min << " and extent: " << for_loop->extent << "\n";
-        // remove the for loop.
-        
-        Stmt body = for_loop->body;
-        return body;
-    }
-
-    // Stmt visit(const For *op) {
-    //     Stmt body = mutate(op->body);
-    //     return body;
-    // }
-public :
-    Expr factor = 1;
 };
+
+class WriteMetrics : public IRMutator {
+    using IRMutator::visit;
+};
+
 
 
 class VariableBindings: public IRVisitor {
@@ -324,68 +343,71 @@ void print_bindings(std::map<std::string, Expr> bindings) {
         debug(-1) << name << " = " << value << "\n";
     }
 }
+
 Stmt mutate_complexity(const Stmt &s) {
-    debug(-1) << "mutate_complexity:\n" << s << "\n";
-    Stmt ss = SCA().mutate(s);
-    debug(-1) << "mutated stmt:\n" << ss << "\n";
-    return ss;
+    debug(-1) << "SCA:\n" << s << "\n\n";
+    debug(-1) << "Running SCA::FindFuncs\n";
+    FindFuncs ff;
+    s.accept(&ff);
+    return s;
     
 }
+
 Pipeline compute_complexity(const Stmt &s) { 
-    debug(-1) << "compute_complexity:\n" << s << "\n";
-    std::vector<Func> outputs;
+    // debug(-1) << "compute_complexity:\n" << s << "\n";
+    // std::vector<Func> outputs;
 
-    // bind variables to symbolic values
-    VariableBindings vb;
-    s.accept(&vb);
-    auto bindings = vb.bindings;
-    print_bindings(vb.bindings);
+    // // bind variables to symbolic values
+    // VariableBindings vb;
+    // s.accept(&vb);
+    // auto bindings = vb.bindings;
+    // print_bindings(vb.bindings);
 
-    // All the visitors
-    ComputeMetrics compute(bindings);
-    BandwidthMetrics bandwidth(bindings);
+    // // All the visitors
+    // ComputeMetrics compute(bindings);
+    // BandwidthMetrics bandwidth(bindings);
 
-    // Number of adds
-    s.accept(&compute);
-    s.accept(&bandwidth);
+    // // Number of adds
+    // s.accept(&compute);
+    // s.accept(&bandwidth);
 
-    Func num_iops("num_iops");
-    Func num_flops("num_flops");
-    Func num_stores("num_stores");
-    Func num_loads("num_loads");
-    Func bytes_written("bytes_written");
-    Func bytes_loaded("bytes_loaded");
-    Func num_transops("num_transops");
-    Func vector_stores("vector_stores");
-    Func vector_loads("vector_loads");
-    /* TODO(@vcanumalla): add float adds back in */ 
+    // Func num_iops("num_iops");
+    // Func num_flops("num_flops");
+    // Func num_stores("num_stores");
+    // Func num_loads("num_loads");
+    // Func bytes_written("bytes_written");
+    // Func bytes_loaded("bytes_loaded");
+    // Func num_transops("num_transops");
+    // Func vector_stores("vector_stores");
+    // Func vector_loads("vector_loads");
+    // /* TODO(@vcanumalla): add float adds back in */ 
 
-    num_flops() = compute.num_flops;
-    num_iops() = compute.num_iops;
-    num_transops() = compute.num_transops;
-    num_stores() = bandwidth.num_stores;
-    num_loads() = bandwidth.num_loads;
-    vector_stores() = bandwidth.vector_stores;
-    vector_loads() = bandwidth.vector_loads;
-    debug(-1) << "num trans ops: " << compute.num_transops << "\n";
-    bytes_written() = bandwidth.bytes_written;
-    bytes_loaded() = bandwidth.bytes_loaded;
-    outputs.push_back(num_iops);
-    outputs.push_back(num_flops);
-    outputs.push_back(num_transops);
-    outputs.push_back(num_stores);
-    outputs.push_back(num_loads);
-    outputs.push_back(bytes_written);
-    outputs.push_back(bytes_loaded);
-    outputs.push_back(vector_stores);
-    outputs.push_back(vector_loads);
+    // num_flops() = compute.num_flops;
+    // num_iops() = compute.num_iops;
+    // num_transops() = compute.num_transops;
+    // num_stores() = bandwidth.num_stores;
+    // num_loads() = bandwidth.num_loads;
+    // vector_stores() = bandwidth.vector_stores;
+    // vector_loads() = bandwidth.vector_loads;
+    // debug(-1) << "num trans ops: " << compute.num_transops << "\n";
+    // bytes_written() = bandwidth.bytes_written;
+    // bytes_loaded() = bandwidth.bytes_loaded;
+    // outputs.push_back(num_iops);
+    // outputs.push_back(num_flops);
+    // outputs.push_back(num_transops);
+    // outputs.push_back(num_stores);
+    // outputs.push_back(num_loads);
+    // outputs.push_back(bytes_written);
+    // outputs.push_back(bytes_loaded);
+    // outputs.push_back(vector_stores);
+    // outputs.push_back(vector_loads);
     
-    Pipeline p(outputs);
-    // std::vector<Func> test;
-    // test.push_back(Func(2 + 2));
-    // test.push_back(Func(3 + 3));
-    // test.push_back(Func(4 + 4));
-    // p = Pipeline(test);
+    // Pipeline p(outputs);
+    std::vector<Func> test;
+    test.push_back(Func(2 + 2));
+    test.push_back(Func(3 + 3));
+    test.push_back(Func(4 + 4));
+    Pipeline p = Pipeline(test);
     return p;
 }
 

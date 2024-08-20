@@ -1653,13 +1653,10 @@ bool GeneratorBase::emit_sca(const std::string &sca_file_path) {
     user_assert(!generator_registered_name.empty() && !generator_stub_name.empty()) << "Generator has no name.\n";
     Module m = build_module();
     Stmt s = m.get_conceptual_stmt();
-    // make a copy of the IR to mutate
-    Stmt s_copy = s;
-    Stmt garbage = mutate_complexity(s_copy);
-    debug(-1) << &s << " vs " << &s_copy << "\n";
+    Pipeline p = compute_complexity(s);
+    Stmt garbage = mutate_complexity(s); 
     std::map<std::string, Parameter> params;  // FIXME: Remove when API allows this to be optional
     std::cout << "Running SCA on Generator " << "...\n";
-    Pipeline p = compute_complexity(s);
     serialize_pipeline(p, sca_file_path, params);
     return true;
 }
