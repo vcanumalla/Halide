@@ -23,47 +23,47 @@
 ///// Lesson 8 Example /////////////////////
 ////////////////////////////////////////////
 
-#include "Halide.h"
-namespace {
-class HalideSCA : public Halide::Generator<HalideSCA> {
-public:
+// #include "Halide.h"
+// namespace {
+// class HalideSCA : public Halide::Generator<HalideSCA> {
+// public:
 
-    Output<Buffer<float, 2>> consumer{"consumer"};
-    void generate() {
-        Var x("x_dim"), y("y_dim");
+//     Output<Buffer<float, 2>> consumer{"consumer"};
+//     void generate() {
+//         Var x("x_dim"), y("y_dim");
 
-        Func producer("producer");
-        producer(x, y) = sin(x * y);
+//         Func producer("producer");
+//         producer(x, y) = sin(x * y);
 
-        consumer(x, y) = (producer(x, y) +
-                    producer(x, y + 1) +
-                    producer(x + 1, y) +
-                    producer(x + 1, y + 1)) / 4;
+//         consumer(x, y) = (producer(x, y) +
+//                     producer(x, y + 1) +
+//                     producer(x + 1, y) +
+//                     producer(x + 1, y + 1)) / 4;
 
-        // stats via tracing using runtime (see `lesson_08_scheduling_2.cpp`) on a 4x4 input:
-        // Full inlining (the default schedule):
-        // - Loads: 0
-        // - Stores: 16
-        // - Calls to sin: 64
+//         // stats via tracing using runtime (see `lesson_08_scheduling_2.cpp`) on a 4x4 input:
+//         // Full inlining (the default schedule):
+//         // - Loads: 0
+//         // - Stores: 16
+//         // - Calls to sin: 64
         
-        /* Evaluating producer first */
-        // producer.compute_root();
-        // stats:
-        // - Loads: 64
-        // - Stores: 41
-        // - Calls to sin: 25
+//         /* Evaluating producer first */
+//         // producer.compute_root();
+//         // stats:
+//         // - Loads: 64
+//         // - Stores: 41
+//         // - Calls to sin: 25
 
-        /* Compute as needed */
-        producer.compute_at(consumer, y);
-        // stats:
-        // - Loads: 64
-        // - Stores: 56
-        // - Calls to sin: 40
+//         /* Compute as needed */
+//         // producer.compute_at(consumer, y);
+//         // stats:
+//         // - Loads: 64
+//         // - Stores: 56
+//         // - Calls to sin: 40
 
-    }
-};
-}  // namespace
-HALIDE_REGISTER_GENERATOR(HalideSCA, halide_sca) 
+//     }
+// };
+// }  // namespace
+// HALIDE_REGISTER_GENERATOR(HalideSCA, halide_sca) 
 
 
 
@@ -100,3 +100,32 @@ HALIDE_REGISTER_GENERATOR(HalideSCA, halide_sca)
 // };
 // }  // namespace
 // HALIDE_REGISTER_GENERATOR(HalideSCA, halide_sca) 
+
+
+/////////////////////////////
+//// Lesson 5 Example ///////
+/////////////////////////////
+
+#include "Halide.h"
+
+namespace {
+class HalideSCA : public Halide::Generator<HalideSCA> {
+public:
+    
+    Input<Buffer<int32_t>> input{"input", 2};
+    Output<Buffer<int32_t>> output{"output", 2};
+    void generate() {
+        Var x("x"), y("y");
+        Func gradient("gradient");
+        gradient(x, y) = x + y;
+        Var x_outer, x_inner;
+        gradient.split(x, x_outer, x_inner, 4);
+        gradient.compute_root();
+        gradient.vectorize(x_inner);
+        output(x, y) = gradient(x, y);
+        
+    }
+
+};
+}
+HALIDE_REGISTER_GENERATOR(HalideSCA, halide_sca) 

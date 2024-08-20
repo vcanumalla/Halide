@@ -10,6 +10,7 @@
 namespace Halide {
 namespace Internal {
 
+Stmt mutate_complexity(const Stmt &s);
 /**
  * Return a Halide pipeline from the given stmt
  */
