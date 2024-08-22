@@ -12,6 +12,10 @@ namespace Halide {
 namespace Internal {
 
 namespace {
+enum Metrics {
+    STORES = 0,
+    LOADS=1
+};
 const std::set<std::string> transcendental_ops = {
     "acos_f16",
     "acosh_f16", 
@@ -72,6 +76,16 @@ const std::set<std::string> transcendental_ops = {
 4. Final mutator can write all the variables to the output buffer _for the func_ 
 5. buffers per each function that have all the metrics
 */
+class UsefulVisitor : public IRVisitor {
+    using IRVisitor::visit;
+    void visit(const Allocate *op) {
+        debug(-1) << "Found an allocate\n";
+        debug(-1) << (op->memory_type == MemoryType::Auto) << "\n";
+        op->body.accept(this);
+    }
+};
+
+// Raw names, no suffixes
 class FindFuncs : public IRVisitor {
     using IRVisitor::visit;
     // if we see a produce stmt, we know this is a distinct halide func
@@ -85,22 +99,84 @@ class FindFuncs : public IRVisitor {
 public:
     std::vector<std::string> funcs;
 };
+
+// create metric array for each func
 class CreateMetrics: public IRMutator {
     using IRMutator::visit;
     // add global exprs for each func
-    
+    Stmt visit(const ProducerConsumer *op) {
+        if (op->is_producer) {
+            if (std::find(func_names.begin(), func_names.end(), op->name) != func_names.end()) {
+                // allocate an empty extents array
+                std::string array_name = op->name + "_metrics_array";
+                std::string produce_buffer_name = op->name + "_metrics_buffer";
+                Stmt s = Allocate::make(array_name, Int(32), MemoryType::Auto, {}, const_true(), ProducerConsumer::make_produce(op->name, mutate(op->body)));
+
+                return Block::make(s, ProducerConsumer::make_produce(produce_buffer_name, Evaluate::make(0)));
+
+            }
+            else {
+                // debug(-1) << "Error with func names\n";
+                return op;
+            }
+        }
+        return op;
+    }
 public:
+    CreateMetrics(std::vector<std::string> f) : func_names(f) {}
     const std::vector<std::string> func_names;
 };
-class StripStores : public IRMutator {
+
+class StripBandwidth : public IRMutator {
     using IRMutator::visit;
+    Stmt visit(const ProducerConsumer *op) {
+        if (op->is_producer) {
+            debug(-1) << "Found a producer: " << op->name << "\n";
+            // TODO: need to make sure we are in the right func
+            current_func = op->name;
+            // go inside
+            return ProducerConsumer::make_produce(op->name, mutate(op->body));
+        }
+        return op;
+    }
+    Stmt visit(const Store *op) {
+        debug(-1) << "Found a store\n";
+        // replace the computational store with a store to the metrics buffer
+        debug(-1) << op->name << " " << op->value << " " << op->predicate << " " << op->index <<  "\n";
+
+        Expr new_total = Load::make(Int(32), current_func_array, Metrics::STORES, Buffer<>(), Parameter(), const_true(), ModulusRemainder()) + 1;
+        Stmt s = Store::make(current_func_array, new_total, Metrics::STORES, Parameter(), op->predicate, ModulusRemainder());
+        return s;
+    }
+public:
+    std::string current_func= "";
+    std::string current_func_array = "";
 };
+
 class SCA : public IRMutator {
     using IRMutator::visit;
 };
 
 class WriteMetrics : public IRMutator {
     using IRMutator::visit;
+    Stmt visit(const ProducerConsumer *op) {
+        if (op->is_producer) {
+            debug(-1) << "Found a producer: " << op->name << "\n";
+            if (std::find(func_names.begin(), func_names.end(), op->name) != func_names.end()) {
+                // write the metrics to the output buffer
+                Stmt s = Store::make(op->name, Load::make(Int(32), op->name, Metrics::STORES, Buffer<>(), Parameter(), const_true(), ModulusRemainder()), Metrics::STORES, Parameter(), const_true(), ModulusRemainder());
+                return ProducerConsumer::make_produce(op->name + "_metrics_output", s);
+            }
+            else {
+                debug(-1) << "Error with func names\n";
+                return op;
+            }
+        }
+        return op;
+    }
+public:
+    WriteMetrics(std::vector<std::string> f) : func_names(f) {}
+    const std::vector<std::string> func_names;
 };
 
 
@@ -349,6 +425,26 @@ Stmt mutate_complexity(const Stmt &s) {
     debug(-1) << "Running SCA::FindFuncs\n";
     FindFuncs ff;
     s.accept(&ff);
+    UsefulVisitor uv;
+    s.accept(&uv);
+    debug(-1) << "Introducing metrics...\n";
+    CreateMetrics cm(ff.funcs);
+    Stmt res = cm.mutate(s);
+    debug(-1) << "Stripping Stores...\n";
+    StripBandwidth ss;
+    debug(-1) << "Result before stripping stores:\n" << res << "\n";
+    res = ss.mutate(res);
+    debug(-1) << "Result:\n" << res << "\n";
+    std::vector<std::string> output_funcs;
+    for (auto s: ff.funcs) {
+        output_funcs.push_back(s + "_metrics_buffer");
+    }
+    for (auto s: output_funcs) {
+        debug(-1) << "Output func: " << s << "\n";
+    }
+    WriteMetrics wm(output_funcs);
+    res = wm.mutate(res);
+    debug(-1) << "Result after writing metrics:\n" << res << "\n";
     return s;
     
 }

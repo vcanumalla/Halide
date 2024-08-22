@@ -119,9 +119,9 @@ public:
         Func gradient("gradient");
         gradient(x, y) = x + y;
         Var x_outer, x_inner;
-        gradient.split(x, x_outer, x_inner, 4);
+        // gradient.split(x, x_outer, x_inner, 4);
         gradient.compute_root();
-        gradient.vectorize(x_inner);
+        // gradient.vectorize(x_inner);
         output(x, y) = gradient(x, y);
         
     }
