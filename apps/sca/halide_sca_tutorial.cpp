@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
         // printf("\nEvaluating producer-consumer pipeline with default schedule\n");
         consumer.realize({4, 4});
         Target target = get_host_target();
-        target.set_feature(Target::NoAsserts);
+        target.set_feature(Target::SCAMetrics);
         consumer.compile_to_file("sca_analysis", {}, "consumer", target);
         // There were no messages about computing values of the
         // producer. This is because the default schedule fully
