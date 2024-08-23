@@ -1652,12 +1652,27 @@ bool GeneratorBase::emit_cpp_stub(const std::string &stub_file_path) {
 bool GeneratorBase::emit_sca(const std::string &sca_file_path) {
     user_assert(!generator_registered_name.empty() && !generator_stub_name.empty()) << "Generator has no name.\n";
     Module m = build_module();
-    Stmt s = m.get_conceptual_stmt();
-    Pipeline p = compute_complexity(s);
-    Stmt garbage = mutate_complexity(s); 
-    std::map<std::string, Parameter> params;  // FIXME: Remove when API allows this to be optional
-    std::cout << "Running SCA on Generator " << "...\n";
-    serialize_pipeline(p, sca_file_path, params);
+
+    std::vector<LoweredFunc> funcs = m.functions();
+    // run sca on each function
+    Module new_m(m.name() + "_sca", m.target());
+    for (LoweredFunc f: funcs) {
+        debug(-1) << "Function: " << f.name << "\n";
+        Stmt body = f.body;
+        body = mutate_complexity(body);
+        LoweredFunc new_f = LoweredFunc(f.name, f.args, body, f.linkage, f.name_mangling);
+        new_m.append(new_f);
+    }
+    std::map<OutputFileType, std::string> output_files;
+    output_files[OutputFileType::static_library] = "sca_static_library.a";
+    output_files[OutputFileType::c_header] = "sca_header.h";
+    new_m.compile(output_files);
+
+    // Pipeline p = compute_complexity(s);
+    // Stmt garbage = mutate_complexity(s); 
+    // std::map<std::string, Parameter> params;  // FIXME: Remove when API allows this to be optional
+    // std::cout << "Running SCA on Generator " << "...\n";
+    // serialize_pipeline(p, sca_file_path, params);
     return true;
 }
 

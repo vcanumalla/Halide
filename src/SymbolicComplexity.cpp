@@ -155,6 +155,12 @@ public:
 
 class SCA : public IRMutator {
     using IRMutator::visit;
+    Stmt visit(const ProducerConsumer *op) {
+        // allocate a metrics array
+        Stmt st = Store::make(op->name + "_metrics_array", 0, Metrics::STORES, Parameter(), const_true(), ModulusRemainder());
+        Stmt s = Allocate::make(op->name + "_metrics_array", Int(32), MemoryType::Auto, {}, const_true(), ProducerConsumer::make_produce(op->name + "_storing", st));
+        return s;
+    }
 };
 
 class WriteMetrics : public IRMutator {
@@ -419,7 +425,11 @@ void print_bindings(std::map<std::string, Expr> bindings) {
         debug(-1) << name << " = " << value << "\n";
     }
 }
-
+Stmt smoketest(const Stmt &s) {
+    debug(-1) << "Running SCA\n";
+    SCA sca;
+    return sca.mutate(s);
+}
 Stmt mutate_complexity(const Stmt &s) {
     debug(-1) << "SCA:\n" << s << "\n\n";
     debug(-1) << "Running SCA::FindFuncs\n";
@@ -503,6 +513,7 @@ Pipeline compute_complexity(const Stmt &s) {
     test.push_back(Func(2 + 2));
     test.push_back(Func(3 + 3));
     test.push_back(Func(4 + 4));
+
     Pipeline p = Pipeline(test);
     return p;
 }

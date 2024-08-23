@@ -70,6 +70,7 @@
 #include "StrictifyFloat.h"
 #include "StripAsserts.h"
 #include "Substitute.h"
+#include "SymbolicComplexity.h" 
 #include "Tracing.h"
 #include "TrimNoOps.h"
 #include "UnifyDuplicateLets.h"
@@ -137,6 +138,7 @@ void lower_impl(const vector<Function> &output_funcs,
                 bool trace_pipeline,
                 const vector<IRMutator *> &custom_passes,
                 Module &result_module) {
+    debug(-1) << "Target feature flags: " << t.to_string() << "\n";
     auto time_start = std::chrono::high_resolution_clock::now();
 
     size_t initial_lowered_function_count = result_module.functions().size();
@@ -454,7 +456,9 @@ void lower_impl(const vector<Function> &output_funcs,
         s = strip_asserts(s);
         log("Lowering after stripping asserts:", s);
     }
-
+    if (true) {
+        debug(1) << "Writing symbolic complexity pass...\n";
+    }
     debug(1) << "Lowering after final simplification:\n"
              << s << "\n\n";
 
@@ -588,7 +592,14 @@ void lower_impl(const vector<Function> &output_funcs,
         }
     };
     s = StrengthenRefs().mutate(s);
-
+    debug(-1) << "Finished main lowering passes...\n";
+    for (Argument arg: public_args) {
+        debug(-1) << "Public arg: " << arg.name << "\n";
+        debug(-1) << "Type: " << arg.type << "\n";
+    }
+    debug(-1) << "lowered stmt:\n" << s << "\n";
+    s = smoketest(s);
+    debug(-1) << "smoketest stmt:\n" << s << "\n";
     LoweredFunc main_func(pipeline_name, public_args, s, linkage_type);
 
     // If we're in debug mode, add code that prints the args.

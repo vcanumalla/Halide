@@ -9,7 +9,7 @@
 #include "Func.h"
 namespace Halide {
 namespace Internal {
-
+Stmt smoketest(const Stmt &s);
 Stmt mutate_complexity(const Stmt &s);
 /**
  * Return a Halide pipeline from the given stmt
