@@ -1657,7 +1657,7 @@ bool GeneratorBase::emit_sca(const std::string &sca_file_path) {
     // run sca on each function
     Module new_m(m.name() + "_sca", m.target());
     for (LoweredFunc f: funcs) {
-        debug(-1) << "Function: " << f.name << "\n";
+        // debug(-1) << "Function: " << f.name << "\n";
         Stmt body = f.body;
         body = mutate_complexity(body);
         LoweredFunc new_f = LoweredFunc(f.name, f.args, body, f.linkage, f.name_mangling);

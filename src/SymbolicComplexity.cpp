@@ -78,10 +78,30 @@ const std::set<std::string> transcendental_ops = {
 */
 class UsefulVisitor : public IRVisitor {
     using IRVisitor::visit;
+    void print_param_info(const Parameter &p) {
+        debug(-1) << "Parameter info:\n";
+        debug(-1) << p.name() << "\n";
+        debug(-1) << p.type() << "\n";
+        debug(-1) << p.dimensions() << "\n";
+        debug(-1) << p.host_alignment() << "\n";
+        // debug(-1) << p.min_value() << "\n";
+        // debug(-1) << p.max_value() << "\n";
+        // debug(-1) << p.estimate() << "\n";
+        // debug(-1) << p.default_value() << "\n";
+    }
     void visit(const Allocate *op) {
         debug(-1) << "Found an allocate\n";
         debug(-1) << (op->memory_type == MemoryType::Auto) << "\n";
         op->body.accept(this);
+    }
+    void visit(const Store *op) {
+        // print info about store
+        debug(-1) << "Found a store\n";
+        debug(-1) << op->name << " " << op->value << " " << op->predicate << " " << op->index <<  "\n";
+        debug(-1) << "Is buffer:" <<  op->param.defined() << "\n";
+        if (op->param.defined()) {
+            print_param_info(op->param);
+        }
     }
 };
 
@@ -126,7 +146,17 @@ public:
     CreateMetrics(std::vector<std::string> f) : func_names(f) {}
     const std::vector<std::string> func_names;
 };
-
+class SimpleStore : public IRMutator {
+    using IRMutator::visit;
+    Stmt visit(const Store *op) {
+        // add an extern call to the metrics buffer
+        std::vector<Expr> args;
+        // args.push_back(53);
+        Expr call_extern = Call::make(type_of<int>(), "update_metrics", args, Call::ExternCPlusPlus);
+        Stmt s = Evaluate::make(call_extern);
+        return Block::make(op, s);
+    }
+};
 class StripBandwidth : public IRMutator {
     using IRMutator::visit;
     Stmt visit(const ProducerConsumer *op) {
@@ -157,9 +187,16 @@ class SCA : public IRMutator {
     using IRMutator::visit;
     Stmt visit(const ProducerConsumer *op) {
         // allocate a metrics array
-        Stmt st = Store::make(op->name + "_metrics_array", 0, Metrics::STORES, Parameter(), const_true(), ModulusRemainder());
-        Stmt s = Allocate::make(op->name + "_metrics_array", Int(32), MemoryType::Auto, {}, const_true(), ProducerConsumer::make_produce(op->name + "_storing", st));
-        return s;
+        // print info about the stores
+        debug(-1) << "Info about original store:\n";
+        debug(-1) << op->name << "\n";
+
+        // create buffer to store in
+        Parameter p = Parameter(Int(32), true, 1, op->name + "_metrics");
+        Stmt st = Store::make("metrics_buffer", 1, Metrics::STORES, p, const_true(), ModulusRemainder());
+        // Stmt s = Allocate::make(op->name + "_metrics_array", Int(32), MemoryType::Auto, {}, const_true(), ProducerConsumer::make_produce(op->name + "_storing", st));
+        Stmt full = Block::make(op, ProducerConsumer::make_produce(op->name + "_storing", st));
+        return st;
     }
 };
 
@@ -428,34 +465,40 @@ void print_bindings(std::map<std::string, Expr> bindings) {
 Stmt smoketest(const Stmt &s) {
     debug(-1) << "Running SCA\n";
     SCA sca;
-    return sca.mutate(s);
+    Stmt t = sca.mutate(s);
+    UsefulVisitor uv;
+    t.accept(&uv);
+    return t;
+
 }
 Stmt mutate_complexity(const Stmt &s) {
     debug(-1) << "SCA:\n" << s << "\n\n";
-    debug(-1) << "Running SCA::FindFuncs\n";
-    FindFuncs ff;
-    s.accept(&ff);
+    // debug(-1) << "Running SCA::FindFuncs\n";
+    // FindFuncs ff;
+    // s.accept(&ff);
+
+    // debug(-1) << "Introducing metrics...\n";
+    // CreateMetrics cm(ff.funcs);
+    // Stmt res = cm.mutate(s);
+    // debug(-1) << "Stripping Stores...\n";
+    // StripBandwidth ss;
+    // debug(-1) << "Result before stripping stores:\n" << res << "\n";
+    // res = ss.mutate(res);
+    // debug(-1) << "Result:\n" << res << "\n";
+    // std::vector<std::string> output_funcs;
+    // for (auto s: ff.funcs) {
+    //     output_funcs.push_back(s + "_metrics_buffer");
+    // }
+    // for (auto s: output_funcs) {
+    //     debug(-1) << "Output func: " << s << "\n";
+    // }
+    // WriteMetrics wm(output_funcs);
+    // res = wm.mutate(res);
+    Stmt res = SimpleStore().mutate(s);
     UsefulVisitor uv;
-    s.accept(&uv);
-    debug(-1) << "Introducing metrics...\n";
-    CreateMetrics cm(ff.funcs);
-    Stmt res = cm.mutate(s);
-    debug(-1) << "Stripping Stores...\n";
-    StripBandwidth ss;
-    debug(-1) << "Result before stripping stores:\n" << res << "\n";
-    res = ss.mutate(res);
-    debug(-1) << "Result:\n" << res << "\n";
-    std::vector<std::string> output_funcs;
-    for (auto s: ff.funcs) {
-        output_funcs.push_back(s + "_metrics_buffer");
-    }
-    for (auto s: output_funcs) {
-        debug(-1) << "Output func: " << s << "\n";
-    }
-    WriteMetrics wm(output_funcs);
-    res = wm.mutate(res);
+    res.accept(&uv);
     debug(-1) << "Result after writing metrics:\n" << res << "\n";
-    return s;
+    return res;
     
 }
 
