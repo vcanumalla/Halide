@@ -368,7 +368,6 @@ void Pipeline::compile_to_static_library(const string &filename_prefix,
                                          const vector<Argument> &args,
                                          const std::string &fn_name,
                                          const Target &target) {
-    debug(-1) << "arg size:" << args.size() << "\n";
     Module m = compile_to_module(args, fn_name, target);
     m.compile(static_library_outputs(filename_prefix, target));
 }
@@ -512,15 +511,6 @@ Module Pipeline::compile_to_module(const vector<Argument> &args,
 
     vector<Argument> lowering_args(args);
 
-    if (target.has_feature(Target::SCAMetrics)) {
-        debug(1) << "found sca metrics flag, will lower accordingly\n";
-        Argument a = Argument();
-        a.name = "sca_metrics";
-        a.kind = Argument::OutputBuffer;
-        a.type = UInt(8);
-        a.dimensions = 1;
-        lowering_args.push_back(a);
-    }
     // If the target specifies user context but it's not in the args
     // vector, add it at the start (the jit path puts it in there
     // explicitly).

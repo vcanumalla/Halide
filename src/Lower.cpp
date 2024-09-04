@@ -147,25 +147,7 @@ void lower_impl(const vector<Function> &output_funcs,
     auto time_start = std::chrono::high_resolution_clock::now();
 
     size_t initial_lowered_function_count = result_module.functions().size();
-    // debug(-1) << "Start of lowering" << "\n";
-    // debug(-1) << "Target: " << t << "\n";
-    debug(1) << "List of output funcs" << "\n";
-    for (const auto &f : output_funcs) {
-        debug(1) << "name: " << f.name() << " ";
-    }
-    debug(1) << "List of arguments: " << "\n";
-    for (const auto &arg : args) {
-        debug(1) << arg.name << " ";
-    }
-    debug(1) << t.has_feature(Target::SCAMetrics) << "\n";
-    // print_module_details(result_module);
-    if (t.has_feature(Target::SCAMetrics)) {
-        // add output function
-        // output_funcs.push_back(Function("sca_metrics"));
-        // add output buffer to args
 
-
-    }
     // Create a deep-copy of the entire graph of Funcs.
     auto [outputs, env] = deep_copy(output_funcs, build_environment(output_funcs));
 

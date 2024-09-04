@@ -33,6 +33,16 @@ void print_display(Metrics sharedVariable) {
             << std::setw(14) << sharedVariable.num_flops << " |" << std::endl;
     std::cout << "+-------------+----------------+" << std::endl; 
 }
+
+void print_serialized(Metrics sharedVariable) {
+    std::cout << sharedVariable.num_loads << std::endl;
+    std::cout << sharedVariable.num_stores << std::endl;
+    std::cout << sharedVariable.bytes_loaded << std::endl;
+    std::cout << sharedVariable.bytes_stored << std::endl;
+    std::cout << sharedVariable.num_iops << std::endl;
+    std::cout << sharedVariable.num_flops << std::endl;
+    std::cout << sharedVariable.num_transops << std::endl;
+}
 int main(int argc, char **argv) {
     
     {
@@ -42,13 +52,7 @@ int main(int argc, char **argv) {
         Halide::Runtime::Buffer<float> output(4, 4);
         Halide::Runtime::Buffer<int> metrics(1);
         int error = consumer_default(metrics, output);
-        for (int i = 0; i < 5; i++) {
-            for (int j = 0; j < 5; j++) {
-                std::cout << output(i, j) << " ";
-            }
-            std::cout << std::endl;
-        }
-        print_display(sharedVariable);
+        print_serialized(sharedVariable);
     }
     
     // Everything worked!
