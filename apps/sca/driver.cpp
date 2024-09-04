@@ -1,13 +1,17 @@
 #include "sca_analysis.h"
 #include <iostream>
 #include "HalideBuffer.h"
-
-int sharedVariable;
+#include "metrics.h"
+#include <iomanip>
+Metrics sharedVariable;
+int sharedLoads;
 int main(int argc, char **argv) {
     
     {
-        sharedVariable = 0;
-        Halide::Runtime::Buffer<float> output(30, 30);
+        sharedVariable.num_stores = 0;
+        sharedVariable.num_loads = 0;
+        sharedLoads = 0;
+        Halide::Runtime::Buffer<float> output(4, 4);
         Halide::Runtime::Buffer<int> metrics(1);
         int error = consumer_default(metrics, output);
         for (int i = 0; i < 5; i++) {
@@ -16,7 +20,18 @@ int main(int argc, char **argv) {
             }
             std::cout << std::endl;
         }
-        std::cout << "Metrics: " << sharedVariable << std::endl;
+        std::cout << "+-------------+----------------+" << std::endl;
+        std::cout << "| Metric      | Number         |" << std::endl;
+        std::cout << "+-------------+----------------+" << std::endl;
+        
+        // Print table rows
+        std::cout << "| " << std::setw(11) << "num_loads" << " | " 
+                << std::setw(14) << sharedLoads << " |" << std::endl;
+        std::cout << "+-------------+----------------+" << std::endl;
+        std::cout << "| " << std::setw(11) << "num_stores" << " | " 
+                << std::setw(14) << sharedVariable.num_stores << " |" << std::endl;
+        std::cout << "+-------------+----------------+" << std::endl;
+
     }
     
     // Everything worked!
