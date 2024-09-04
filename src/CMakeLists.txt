@@ -159,6 +159,7 @@ set(HEADER_FILES
     StrictifyFloat.h
     StripAsserts.h
     Substitute.h
+    SymbolicComplexity.h
     Target.h
     Tracing.h
     TrimNoOps.h
@@ -345,6 +346,7 @@ set(SOURCE_FILES
     StrictifyFloat.cpp
     StripAsserts.cpp
     Substitute.cpp
+    SymbolicComplexity.cpp
     Target.cpp
     Tracing.cpp
     TrimNoOps.cpp

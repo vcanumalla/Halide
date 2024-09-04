@@ -12,6 +12,7 @@
 #include "Module.h"
 #include "Serialization.h"
 #include "Simplify.h"
+#include "SymbolicComplexity.h"
 
 #ifdef HALIDE_ALLOW_GENERATOR_BUILD_METHOD
 #pragma message "Support for Generator build() methods has been removed in Halide version 15."
@@ -656,7 +657,7 @@ gengen
      [assembly, bitcode, c_header, c_source, cpp_stub, featurization,
       llvm_assembly, object, python_extension, pytorch_wrapper, registration,
       schedule, static_library, stmt, stmt_html, conceptual_stmt,
-      conceptual_stmt_html, compiler_log, hlpipe, device_code].
+      conceptual_stmt_html, compiler_log, hlpipe, sca, device_code].
      If omitted, default value is [c_header, static_library, registration].
 
  -p  A comma-separated list of shared libraries that will be loaded before the
@@ -802,6 +803,7 @@ gengen
             {"cpp", OutputFileType::c_source},
             {"h", OutputFileType::c_header},
             {"hlpipe", OutputFileType::hlpipe},
+            {"sca", OutputFileType::sca},
             {"html", OutputFileType::stmt_html},
             {"o", OutputFileType::object},
             {"py.c", OutputFileType::python_extension},
@@ -1078,6 +1080,15 @@ void execute_generator(const ExecuteGeneratorArgs &args_in) {
             gen->emit_cpp_stub(output_files[OutputFileType::cpp_stub]);
         }
 
+        if (args.output_types.count(OutputFileType::sca)) {
+            std::cout << "Generating SCA for " << args.generator_name << "...\n";
+            // FIXME: this should obviously be multiple targets like below when we write actual code
+            const Target &target = args.targets[0];
+            // auto gen = args.create_generator(args.generator_name, GeneratorContext(target));
+            auto gen = generator_factory(args.function_name, target);
+            auto output_files = compute_output_files(target, base_path, args.output_types);
+            gen->emit_sca(output_files[OutputFileType::sca]);
+        }
 #ifdef WITH_SERIALIZATION
         if (args.output_types.count(OutputFileType::hlpipe)) {
             // When serializing a halide pipeline, target is required (since the schedule may be target dependent).
@@ -1635,6 +1646,33 @@ bool GeneratorBase::emit_cpp_stub(const std::string &stub_file_path) {
     std::ofstream file(stub_file_path);
     StubEmitter emit(file, generator_registered_name, generator_stub_name, pi.generator_params(), pi.inputs(), pi.outputs());
     emit.emit();
+    return true;
+}
+
+bool GeneratorBase::emit_sca(const std::string &sca_file_path) {
+    user_assert(!generator_registered_name.empty() && !generator_stub_name.empty()) << "Generator has no name.\n";
+    Module m = build_module();
+
+    std::vector<LoweredFunc> funcs = m.functions();
+    // run sca on each function
+    Module new_m(m.name() + "_sca", m.target());
+    for (LoweredFunc f: funcs) {
+        // debug(-1) << "Function: " << f.name << "\n";
+        Stmt body = f.body;
+        body = mutate_complexity(body);
+        LoweredFunc new_f = LoweredFunc(f.name, f.args, body, f.linkage, f.name_mangling);
+        new_m.append(new_f);
+    }
+    std::map<OutputFileType, std::string> output_files;
+    output_files[OutputFileType::static_library] = "sca_static_library.a";
+    output_files[OutputFileType::c_header] = "sca_header.h";
+    new_m.compile(output_files);
+
+    // Pipeline p = compute_complexity(s);
+    // Stmt garbage = mutate_complexity(s); 
+    // std::map<std::string, Parameter> params;  // FIXME: Remove when API allows this to be optional
+    // std::cout << "Running SCA on Generator " << "...\n";
+    // serialize_pipeline(p, sca_file_path, params);
     return true;
 }
 
