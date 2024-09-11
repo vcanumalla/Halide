@@ -9,7 +9,6 @@ void print_display(Metrics sharedVariable) {
     std::cout << "+-------------+----------------+" << std::endl;
     std::cout << "| Metric      | Count          |" << std::endl;
     std::cout << "+-------------+----------------+" << std::endl;
-
     std::cout << "|          Bandwidth           |" << std::endl;
     std::cout << "+-------------+----------------+" << std::endl;  
     // Print table rows
@@ -46,17 +45,22 @@ void print_serialized(Metrics sharedVariable) {
 int main(int argc, char **argv) {
     
     {
+        if (argc < 3) {
+            printf("Usage: ./driver <width> <height>\n");
+            return 1;
+        }
+        int width = atoi(argv[1]);
+        int height = atoi(argv[2]);
         sharedVariable.num_stores = 0;
         sharedVariable.num_loads = 0;
         sharedLoads = 0;
-        Halide::Runtime::Buffer<float> output(4, 4);
-        Halide::Runtime::Buffer<int> metrics(1);
-        int error = consumer_default(metrics, output);
-        print_serialized(sharedVariable);
+        Halide::Runtime::Buffer<float> output(width, height);
+        int error = consumer_default(output);
+        // print_serialized(sharedVariable);
+        print_display(sharedVariable);
     }
     
     // Everything worked!
-    printf("Success!\n");
     return 0;
 }
 

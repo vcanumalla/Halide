@@ -65,12 +65,20 @@ const std::set<std::string> transcendental_ops = {
     "tan_f64",
     "tanh_f64",
 };
-
+class UsefulVisitor : public IRVisitor {
+    using IRVisitor::visit;
+    void visit(const Load *op) {
+        op->index.accept(this);
+    }
+    void visit(const Store *op) {
+        op->value.accept(this);
+        op->index.accept(this);
+    }
+};
 class FindBandwidth : public IRVisitor {
     using IRVisitor::visit;
     void visit(const Load *op) {
         // increment load
-        debug(-1) << "Found a load\n";
         num_loads++;
         int bytes = op->type.bytes();
 
@@ -83,7 +91,6 @@ class FindBandwidth : public IRVisitor {
     }
     void visit(const Store *op) {
         // increment store
-        debug(-1) << "Found a store\n";
         num_stores++;
         int bytes = op->value.type().bytes();
 
@@ -102,9 +109,9 @@ class FindBandwidth : public IRVisitor {
     void visit(const IfThenElse *op) {
         // do nothing
     }
-    void visit(const ProducerConsumer *op) {
-        // do nothing
-    }
+    // void visit(const ProducerConsumer *op) {
+    //     // do nothing
+    // }
     public:
         int num_loads = 0;
         int num_stores = 0;
@@ -162,6 +169,7 @@ class FindComputeOps : public IRVisitor {
     }
     void visit(const IfThenElse *op) {
     }
+    void visit(const ProducerConsumer *op) {}
     public:
         int num_iops = 0;
         int num_flops = 0;
@@ -233,6 +241,9 @@ class CallInjection : public IRMutator {
         Stmt condition = Evaluate::make(op->condition);
         condition.accept(&condition_bandwidth);
 
+        FindComputeOps condition_compute;
+        condition.accept(&condition_compute);
+
 
         int then_load_count = 0;
         int then_store_count = 0;
@@ -242,24 +253,42 @@ class CallInjection : public IRMutator {
         int else_store_count = 0;
         int else_bytes_loaded = 0;
         int else_bytes_stored = 0;
+        int then_compute_iops = 0;
+        int then_compute_flops = 0;
+        int then_compute_transops = 0;
+        int else_compute_iops = 0;
+        int else_compute_flops = 0;
+        int else_compute_transops = 0;
 
         Stmt then_case = op->then_case;
         Stmt else_case = op->else_case;
         if (!is_no_op(then_case)) {
             FindBandwidth then_loads;
+            FindComputeOps then_compute;
             then_case.accept(&then_loads);
             then_load_count += then_loads.num_loads + condition_bandwidth.num_loads;
             then_store_count += then_loads.num_stores + condition_bandwidth.num_stores;
             then_bytes_stored += then_loads.bytes_stored + condition_bandwidth.bytes_stored;
             then_bytes_loaded += then_loads.bytes_loaded + condition_bandwidth.bytes_loaded;
+
+            then_case.accept(&then_compute);
+            then_compute_iops += then_compute.num_iops + condition_compute.num_iops;
+            then_compute_flops += then_compute.num_flops + condition_compute.num_flops;
+            then_compute_transops += then_compute.num_transops + condition_compute.num_transops;
         }
         if (!is_no_op(else_case)) {
             FindBandwidth else_loads;
+            FindComputeOps else_compute;
             else_case.accept(&else_loads);
             else_load_count += else_loads.num_loads + condition_bandwidth.num_loads;
             else_store_count += else_loads.num_stores + condition_bandwidth.num_stores;
             else_bytes_stored += else_loads.bytes_stored + condition_bandwidth.bytes_stored;
             else_bytes_loaded += else_loads.bytes_loaded + condition_bandwidth.bytes_loaded;
+
+            else_case.accept(&else_compute);
+            else_compute_iops += else_compute.num_iops + condition_compute.num_iops;
+            else_compute_flops += else_compute.num_flops + condition_compute.num_flops;
+            else_compute_transops += else_compute.num_transops + condition_compute.num_transops;
         }
         Stmt mut_then = mutate(op->then_case);
         Stmt mut_else = mutate(op->else_case);
@@ -273,6 +302,15 @@ class CallInjection : public IRMutator {
             mut_then = Block::make(then_call, mut_then);
         }
 
+        if (then_compute_flops > 0 || then_compute_iops > 0 || then_compute_transops > 0) {
+            std::vector<Expr> then_args;
+            then_args.push_back(then_compute_iops);
+            then_args.push_back(then_compute_flops);
+            then_args.push_back(then_compute_transops);
+            Stmt then_call = Evaluate::make(Call::make(Int(32), "increment_compute_ops", then_args, Call::ExternCPlusPlus));
+            mut_then = Block::make(then_call, mut_then);
+        }
+
         if (else_load_count > 0) {
             std::vector<Expr> else_args;
             else_args.push_back(else_load_count);
@@ -282,7 +320,40 @@ class CallInjection : public IRMutator {
             Stmt else_call = Evaluate::make(Call::make(Int(32), "increment_bandwidth_ops", else_args, Call::ExternCPlusPlus));
             mut_else = Block::make(else_call, mut_else);
         }
+
+        if (else_compute_flops > 0 || else_compute_iops > 0 || else_compute_transops > 0) {
+            std::vector<Expr> else_args;
+            else_args.push_back(else_compute_iops);
+            else_args.push_back(else_compute_flops);
+            else_args.push_back(else_compute_transops);
+            Stmt else_call = Evaluate::make(Call::make(Int(32), "increment_compute_ops", else_args, Call::ExternCPlusPlus));
+            mut_else = Block::make(else_call, mut_else);
+        }
+
+
         return IfThenElse::make(op->condition, mut_then, mut_else);
+    }
+    Stmt visit(const ProducerConsumer *op) override {
+        FindBandwidth loads;
+        FindBandwidth stores;
+        op->body.accept(&loads);
+        op->body.accept(&stores);
+        std::vector<Expr> args;
+        args.push_back(loads.num_loads);
+        args.push_back(stores.num_stores);
+        args.push_back(loads.bytes_loaded);
+        args.push_back(stores.bytes_stored);
+        Stmt call = Evaluate::make(Call::make(Int(32), "increment_bandwidth_ops", args, Call::ExternCPlusPlus));
+        Stmt new_body = Block::make(call, mutate(op->body));
+
+        FindComputeOps fco;
+        args.clear();
+        op->body.accept(&fco);
+        args.push_back(fco.num_iops);
+        args.push_back(fco.num_flops);
+        args.push_back(fco.num_transops);
+        new_body = Block::make(Evaluate::make(Call::make(Int(32), "increment_compute_ops", args, Call::ExternCPlusPlus)), new_body);
+        return ProducerConsumer::make(op->name, op->is_producer, new_body);
     }
 };
 
@@ -290,10 +361,38 @@ class CallInjection : public IRMutator {
 
 
 Stmt mutate_complexity(const Stmt &s) {
-    debug(-1) << "SCA:\n" << s << "\n\n";
     Stmt res = s;
     CallInjection sca;
+    FindBandwidth fb;
+    FindComputeOps fco;
+    UsefulVisitor uv;
+    res.accept(&uv);
+    res.accept(&fb);
+    res.accept(&fco);
+    
+    int loads = fb.num_loads;
+    int stores = fb.num_stores;
+    int bytes_loaded = fb.bytes_loaded;
+    int bytes_stored = fb.bytes_stored;
+    int iops = fco.num_iops;
+    int flops = fco.num_flops;
+    int transops = fco.num_transops;
+    std::vector<Expr> args;
+    args.push_back(loads);
+    args.push_back(stores);
+    args.push_back(bytes_loaded);
+    args.push_back(bytes_stored);
+    res = Block::make(Evaluate::make(Call::make(Int(32), "increment_bandwidth_ops", args, Call::ExternCPlusPlus)), res);
+    args.clear();
+    args.push_back(iops);
+    args.push_back(flops);
+    args.push_back(transops);
+    res = Block::make(Evaluate::make(Call::make(Int(32), "increment_compute_ops", args, Call::ExternCPlusPlus)), res);
+
     res = sca.mutate(res);
+    // std::vector<Expr> args;
+    // args.push_back(0); args.push_back(0); args.push_back(0);
+    // res = Block::make(Evaluate::make(Call::make(Int(32), "increment_compute_ops", args, Call::ExternCPlusPlus)), res);
     return res;
     
 }

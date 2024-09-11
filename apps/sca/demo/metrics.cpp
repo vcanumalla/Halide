@@ -11,5 +11,3 @@ void increment_compute_ops(int iops, int flops, int transops) {
     sharedVariable.num_flops += flops;
     sharedVariable.num_transops += transops;
 }
-// 
-// create a struct that has the 

@@ -10,12 +10,22 @@ int main(int argc, char **argv) {
                           producer(x, y + 1) +
                           producer(x + 1, y) +
                           producer(x + 1, y + 1)) / 4;
+        
+
         producer.compute_root();
+
+        // producer.compute_at(consumer, y);
+
+        // producer.store_root();
+        // producer.compute_at(consumer, y);
+
+
         Target t = get_host_target();
         t.set_feature(Target::SCAMetrics);
         t.set_feature(Target::CPlusPlusMangling);
         // no asserts
         t.set_feature(Target::NoAsserts);
+        std::cout << "Target: " << t.to_string() << std::endl;
         consumer.compile_to_static_library("sca_analysis", {}, "consumer_default", t);
         printf("\n");
     }

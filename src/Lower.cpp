@@ -461,9 +461,12 @@ void lower_impl(const vector<Function> &output_funcs,
         s = strip_asserts(s);
         log("Lowering after stripping asserts:", s);
     }
-    if (true) {
-        debug(1) << "Writing symbolic complexity pass...\n";
+    if (t.has_feature(Target::SCAMetrics)) {
+        debug(1) << "Injecting SCA metrics...\n";
+        s = mutate_complexity(s);
+        log("Lowering after injecting SCA metrics:", s);
     }
+
     debug(1) << "Lowering after final simplification:\n"
              << s << "\n\n";
 
@@ -476,7 +479,6 @@ void lower_impl(const vector<Function> &output_funcs,
         }
     }
 
-    // debug(1) << "Check at line 480 for size: " << result_module.functions().size() << " " << result_module.buffers().size() << "\n";
     // Make a copy of the Stmt code, before we lower anything to less human-readable code.
     result_module.set_conceptual_code_stmt(s);
 
@@ -580,8 +582,6 @@ void lower_impl(const vector<Function> &output_funcs,
             user_error << err.str();
         }
     }
-
-    // debug(1) << "Check at line 480 for size: " << result_module.functions().size() << " " << result_module.buffers().size() << "\n";
     // We're about to drop the environment and outputs vector, which
     // contain the only strong refs to Functions that may still be
     // pointed to by the IR. So make those refs strong.
@@ -602,12 +602,6 @@ void lower_impl(const vector<Function> &output_funcs,
         }
     };
     s = StrengthenRefs().mutate(s);
-
-    if (t.has_feature(Target::SCAMetrics)) {
-        s = mutate_complexity(s);
-    }
-    debug(1) << "Lowering after mutating complexity:\n"
-             << s << "\n\n";
     LoweredFunc main_func(pipeline_name, public_args, s, linkage_type);
 
     // If we're in debug mode, add code that prints the args.
