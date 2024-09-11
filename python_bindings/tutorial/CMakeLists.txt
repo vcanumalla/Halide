@@ -1,4 +1,4 @@
-if (TARGET_WEBASSEMBLY AND Halide_TARGET MATCHES "webgpu")
+if (Halide_TARGET MATCHES "webgpu")
     message(WARNING "Python tutorials are not supported with WebGPU.")
     return()
 endif ()
@@ -19,17 +19,17 @@ set(tests
     lesson_12_using_the_gpu.py
     lesson_13_tuples.py
     lesson_14_types.py
-    )
+)
 
 set(PYPATH_lesson_10_aot_compilation_run "$<TARGET_FILE_DIR:lesson_10_halide>")
 
 foreach (test IN LISTS tests)
-    if (TARGET_WEBASSEMBLY AND Halide_TARGET MATCHES "wasm" AND test MATCHES "lesson_10")
+    if (Halide_TARGET MATCHES "wasm" AND test MATCHES "lesson_10")
         message(WARNING "Not all tutorials build under WASM.")
         continue()
     endif ()
 
-    if (TARGET_VULKAN AND Halide_TARGET MATCHES "vulkan" AND test MATCHES "lesson_10")
+    if (Halide_TARGET MATCHES "vulkan" AND test MATCHES "lesson_10")
         message(WARNING "Not all tutorials build under Vulkan.")
         continue()
     endif ()
@@ -42,9 +42,9 @@ foreach (test IN LISTS tests)
     )
 endforeach ()
 
-if (TARGET_WEBASSEMBLY AND Halide_TARGET MATCHES "wasm")
+if (Halide_TARGET MATCHES "wasm")
     message(WARNING "Not all tutorials build under WASM.")
-elseif (TARGET_VULKAN AND Halide_TARGET MATCHES "vulkan")
+elseif (Halide_TARGET MATCHES "vulkan")
     message(WARNING "Not all tutorials build under Vulkan.")
 else ()
     ## Add some hacks for getting CMake to delay compiling lesson_10_halide until after the test has run. The "better" way
@@ -64,9 +64,9 @@ else ()
 
     # This target allows CMake to build lesson_10_halide.so (or whatever the correct extension is) as part of the tests
     # later. It is excluded from ALL since it isn't valid to build outside of this context.
-    Python3_add_library(lesson_10_halide MODULE EXCLUDE_FROM_ALL
-                        lesson_10_halide.py.cpp
-                        lesson_10_halide.o)
+    Python_add_library(lesson_10_halide MODULE EXCLUDE_FROM_ALL
+                       lesson_10_halide.py.cpp
+                       lesson_10_halide.o)
 
     target_link_libraries(lesson_10_halide PRIVATE Halide::Runtime)
 
@@ -91,14 +91,3 @@ else ()
     set_tests_properties(python_tutorial_lesson_10_aot_compilation_run PROPERTIES
                          FIXTURES_REQUIRED py_lesson_10)
 endif ()
-
-##
-# Packaging
-##
-
-include(GNUInstallDirs)
-
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
-        DESTINATION ${CMAKE_INSTALL_DOCDIR}/tutorial-python
-        COMPONENT Halide_Documentation
-        FILES_MATCHING PATTERN "*.py")

@@ -49,8 +49,8 @@ add_tutorial(lesson_07_multi_stage_pipelines.cpp WITH_IMAGE_IO)
 add_tutorial(lesson_08_scheduling_2.cpp WITH_IMAGE_IO WITH_OPENMP GROUPS multithreaded)
 add_tutorial(lesson_09_update_definitions.cpp WITH_IMAGE_IO WITH_OPENMP GROUPS multithreaded)
 
-if (TARGET_NVPTX)
-    if (TARGET_WEBASSEMBLY AND Halide_TARGET MATCHES "wasm")
+if ("NVPTX" IN_LIST Halide_LLVM_COMPONENTS)
+    if (Halide_TARGET MATCHES "wasm")
         # TODO: Requires custom build rules to work under wasm.
         message(WARNING "Not all tutorials build under WASM.")
     else ()
@@ -154,7 +154,7 @@ set_tests_properties(tutorial_lesson_15_check_files PROPERTIES
                      FIXTURES_REQUIRED tutorial_lesson_15)
 
 # Lesson 16
-if (TARGET_WEBASSEMBLY AND Halide_TARGET MATCHES "wasm")
+if (Halide_TARGET MATCHES "wasm")
     # TODO: Requires custom build rules to work under wasm
     message(WARNING "Not all tutorials build under WASM.")
 else ()
@@ -162,13 +162,13 @@ else ()
     target_link_libraries(lesson_16_rgb_generate PRIVATE Halide::Generator)
 
     add_halide_library(brighten_planar FROM lesson_16_rgb_generate
-                       GENERATOR brighten PARAMS layout=planar)
+                       TARGETS cmake GENERATOR brighten PARAMS layout=planar)
     add_halide_library(brighten_interleaved FROM lesson_16_rgb_generate
-                       GENERATOR brighten PARAMS layout=interleaved)
+                       TARGETS cmake GENERATOR brighten PARAMS layout=interleaved)
     add_halide_library(brighten_either FROM lesson_16_rgb_generate
-                       GENERATOR brighten PARAMS layout=either)
+                       TARGETS cmake GENERATOR brighten PARAMS layout=either)
     add_halide_library(brighten_specialized FROM lesson_16_rgb_generate
-                       GENERATOR brighten PARAMS layout=specialized)
+                       TARGETS cmake GENERATOR brighten PARAMS layout=specialized)
 
     add_executable(lesson_16_rgb_run lesson_16_rgb_run.cpp)
     target_link_libraries(lesson_16_rgb_run PRIVATE

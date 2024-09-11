@@ -1,5 +1,9 @@
-cmake_minimum_required(VERSION 3.22...3.23)
-project(Halide_Python)
+cmake_minimum_required(VERSION 3.28)
+project(Halide_Python VERSION 19.0.0)
+
+if (PROJECT_IS_TOP_LEVEL)
+    enable_testing()
+endif ()
 
 include(CMakeDependentOption)
 
@@ -13,19 +17,24 @@ option(CMAKE_CXX_STANDARD_REQUIRED "Prevent CMake C++ standard selection decay" 
 option(CMAKE_CXX_EXTENSIONS "Enable C++ vendor extensions (e.g. GNU)" OFF)
 
 # Duplicated options from parent project
-option(WITH_TESTS "Build tests" ON)
-option(WITH_TUTORIALS "Build tutorials" ON)
-option(WITH_PYTHON_STUBS "Build Python stubs" ON)
+option(WITH_TESTS "Build tests" "${PROJECT_IS_TOP_LEVEL}")
+option(WITH_TUTORIALS "Build tutorials" "${PROJECT_IS_TOP_LEVEL}")
+option(WITH_PACKAGING "Include install() rules" "${PROJECT_IS_TOP_LEVEL}")
 
-# Enable/disable testing
+# Support not actually building the bindings, but using the ones we find
+# via `find_package(Halide)`. This allows running tests against the
+# installed Halide package.
+option(WITH_PYTHON_BINDINGS "Build Python bindings" ON)
+
+cmake_dependent_option(
+    WITH_PYTHON_STUBS "Build Python stubs" ON
+    WITH_PYTHON_BINDINGS OFF
+)
+
 cmake_dependent_option(
     WITH_TEST_PYTHON "Build Python tests" ON
     WITH_TESTS OFF
 )
-
-# Set the expected (downloaded) version of pybind11
-option(PYBIND11_USE_FETCHCONTENT "Enable to download pybind11 via FetchContent" ON)
-set(PYBIND11_VER 2.10.4 CACHE STRING "The pybind11 version to use (or download)")
 
 ##
 # Dependencies
@@ -35,63 +44,28 @@ set(PYBIND11_VER 2.10.4 CACHE STRING "The pybind11 version to use (or download)"
 # Development.Module and Development.Embed. We don't need the Embed
 # part, so only requesting Module avoids failures when Embed is not
 # available, as is the case in the manylinux Docker images.
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
-if (Python3_VERSION VERSION_LESS "3.8")
-    message(FATAL_ERROR "Halide requires Python v3.8 or later, but found ${Python3_VERSION}.")
-endif ()
-message(STATUS "Found Python ${Python3_VERSION} at ${Python3_EXECUTABLE}")
+find_package(Python 3.8 REQUIRED Interpreter Development.Module)
 
-if (PYBIND11_USE_FETCHCONTENT)
-    include(FetchContent)
-    FetchContent_Declare(
-        pybind11
-        GIT_REPOSITORY https://github.com/pybind/pybind11.git
-        GIT_TAG v${PYBIND11_VER}
-    )
-    FetchContent_MakeAvailable(pybind11)
-else ()
-    find_package(pybind11 ${PYBIND11_VER} REQUIRED)
+if (WITH_PYTHON_BINDINGS)
+    find_package(pybind11 2.10.4 REQUIRED)
 endif ()
 
+# Note: this must happen, especially when WITH_PYTHON_BINDINGS is OFF.
 find_package(Halide REQUIRED Halide)
 if (NOT Halide_ENABLE_RTTI OR NOT Halide_ENABLE_EXCEPTIONS)
     message(FATAL_ERROR "Python bindings require RTTI and exceptions to be enabled.")
 endif ()
 
-##
-# A helper for creating tests with correct PYTHONPATH and sanitizer preloading
-##
-
-function(add_python_test)
-    cmake_parse_arguments(ARG "" "FILE;LABEL" "PYTHONPATH;ENVIRONMENT;TEST_ARGS" ${ARGN})
-
-    list(PREPEND ARG_PYTHONPATH "$<TARGET_FILE_DIR:Halide::Python>/..")
-    list(TRANSFORM ARG_PYTHONPATH PREPEND "PYTHONPATH=path_list_prepend:")
-
-    list(PREPEND ARG_ENVIRONMENT "HL_TARGET=${Halide_TARGET};HL_JIT_TARGET=${Halide_TARGET}")
-
-    cmake_path(GET ARG_FILE STEM test_name)
-    set(test_name "${ARG_LABEL}_${test_name}")
-
-    add_test(
-        NAME "${test_name}"
-        COMMAND ${Halide_PYTHON_LAUNCHER} "$<TARGET_FILE:Python3::Interpreter>" "$<SHELL_PATH:${CMAKE_CURRENT_SOURCE_DIR}/${ARG_FILE}>" ${ARG_TEST_ARGS}
-    )
-    set_tests_properties(
-        "${test_name}"
-        PROPERTIES
-        LABELS "python"
-        ENVIRONMENT "${ARG_ENVIRONMENT}"
-        ENVIRONMENT_MODIFICATION "${ARG_PYTHONPATH}"
-    )
-endfunction()
-
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(AddPythonTest)
 
 ##
 # Add our sources to this sub-tree.
 ##
 
-add_subdirectory(src)
+if (WITH_PYTHON_BINDINGS)
+    add_subdirectory(src)
+endif ()
 
 if (WITH_PYTHON_STUBS)
     add_subdirectory(stub)
@@ -104,4 +78,8 @@ endif ()
 
 if (WITH_TUTORIALS)
     add_subdirectory(tutorial)
+endif ()
+
+if (WITH_PACKAGING)
+    add_subdirectory(packaging)
 endif ()
