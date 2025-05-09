@@ -70,6 +70,7 @@
 #include "StrictifyFloat.h"
 #include "StripAsserts.h"
 #include "Substitute.h"
+#include "SymbolicComplexity.h" 
 #include "TargetQueryOps.h"
 #include "Tracing.h"
 #include "TrimNoOps.h"
@@ -128,7 +129,13 @@ public:
         }
     }
 };
-
+void print_module_details(Module m) {
+    debug(1) << "Module name: " << m.name() << "\n";
+    debug(1) << "Module target: " << m.target().to_string() << "\n";
+    debug(1) << "Module any strict float: " << m.any_strict_float() << "\n";
+    debug(1) << "Module functions size: " << m.functions().size() << "\n";
+    debug(1) << "Module buffers size: " << m.buffers().size() << "\n";
+}
 void lower_impl(const vector<Function> &output_funcs,
                 const string &pipeline_name,
                 const Target &t,
@@ -250,7 +257,7 @@ void lower_impl(const vector<Function> &output_funcs,
     debug(1) << "Adding checks for images\n";
     s = add_image_checks(s, outputs, t, order, env, func_bounds, will_inject_host_copies);
     log("Lowering after injecting image checks:", s);
-
+    debug(1) << "Check at line 258 for size: " << result_module.functions().size() << " " << result_module.buffers().size() << "\n";
     debug(1) << "Removing code that depends on undef values...\n";
     s = remove_undef(s);
     log("Lowering after removing code that depends on undef values:", s);
@@ -457,6 +464,11 @@ void lower_impl(const vector<Function> &output_funcs,
         s = strip_asserts(s);
         log("Lowering after stripping asserts:", s);
     }
+    if (t.has_feature(Target::SCAMetrics)) {
+        debug(1) << "Injecting SCA metrics...\n";
+        s = mutate_complexity(s);
+        log("Lowering after injecting SCA metrics:", s);
+    }
 
     debug(1) << "Lowering after final simplification:\n"
              << s << "\n\n";
@@ -527,7 +539,10 @@ void lower_impl(const vector<Function> &output_funcs,
                                      buf.type(), buf.dimensions(), buf.get_argument_estimates());
         }
     }
-
+    debug(1) << "public_args size: " << public_args.size() << "\n";
+    for (const auto &arg : public_args) {
+        debug(1) << "arg name:" << arg.name << " ";
+    }
     for (const InferredArgument &arg : inferred_args) {
         if (arg.param.defined() && arg.param.name() == "__user_context") {
             // The user context is always in the inferred args, but is
@@ -570,7 +585,6 @@ void lower_impl(const vector<Function> &output_funcs,
             user_error << err.str();
         }
     }
-
     // We're about to drop the environment and outputs vector, which
     // contain the only strong refs to Functions that may still be
     // pointed to by the IR. So make those refs strong.
@@ -591,7 +605,6 @@ void lower_impl(const vector<Function> &output_funcs,
         }
     };
     s = StrengthenRefs().mutate(s);
-
     LoweredFunc main_func(pipeline_name, public_args, s, linkage_type);
 
     // If we're in debug mode, add code that prints the args.
@@ -620,12 +633,20 @@ Module lower(const vector<Function> &output_funcs,
              bool trace_pipeline,
              const vector<IRMutator *> &custom_passes) {
     Module result_module{strip_namespaces(pipeline_name), t};
+    debug(1) << "please print" << "\n";
     run_with_large_stack([&]() {
         lower_impl(output_funcs, pipeline_name, t, args, linkage_type, requirements, trace_pipeline, custom_passes, result_module);
     });
     return result_module;
 }
-
+void print_arg_info(Argument a) {
+    debug(1) << "Argument name: " << a.name << "\n";
+    debug(1) << "Argument kind: " << a.kind << "\n";
+    debug(1) << "Argument type: " << a.type << "\n";
+    if (a.is_buffer()) {
+        debug(1) << "Argument dimensions: " << a.dimensions << "\n";
+    }
+}
 Stmt lower_main_stmt(const std::vector<Function> &output_funcs,
                      const std::string &pipeline_name,
                      const Target &t,
@@ -638,12 +659,13 @@ Stmt lower_main_stmt(const std::vector<Function> &output_funcs,
     vector<Argument> args;
     for (const auto &ia : inferred_args) {
         if (!ia.arg.name.empty() && ia.arg.is_input()) {
+            print_arg_info(ia.arg);
             args.push_back(ia.arg);
         }
     }
 
     Module module = lower(output_funcs, pipeline_name, t, args, LinkageType::External, requirements, trace_pipeline, custom_passes);
-
+    debug(1) << "Check at line 679 for size: " << module.functions().size() << " " << module.buffers().size() << "\n";
     return module.functions().front().body;
 }
 

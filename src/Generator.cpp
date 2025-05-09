@@ -12,6 +12,7 @@
 #include "Module.h"
 #include "Serialization.h"
 #include "Simplify.h"
+#include "SymbolicComplexity.h"
 
 #ifdef HALIDE_ALLOW_GENERATOR_BUILD_METHOD
 #pragma message "Support for Generator build() methods has been removed in Halide version 15."

@@ -581,6 +581,7 @@ SOURCE_FILES = \
   StrictifyFloat.cpp \
   StripAsserts.cpp \
   Substitute.cpp \
+  SymbolicComplexity.cpp \
   Target.cpp \
   TargetQueryOps.cpp \
   Tracing.cpp \
@@ -766,6 +767,7 @@ HEADER_FILES = \
   StrictifyFloat.h \
   StripAsserts.h \
   Substitute.h \
+  SymbolicComplexity.h \
   Target.h \
   TargetQueryOps.h \
   Tracing.h \

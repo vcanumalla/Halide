@@ -201,6 +201,7 @@ target_sources(
     StrictifyFloat.h
     StripAsserts.h
     Substitute.h
+    SymbolicComplexity.h
     Target.h
     TargetQueryOps.h
     Tracing.h
@@ -393,6 +394,7 @@ target_sources(
     StrictifyFloat.cpp
     StripAsserts.cpp
     Substitute.cpp
+    SymbolicComplexity.cpp
     Target.cpp
     TargetQueryOps.cpp
     Tracing.cpp
